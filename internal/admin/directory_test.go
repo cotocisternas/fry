@@ -68,17 +68,8 @@ func TestLiveSMTPRouteAndIMAPCredentialChanges(t *testing.T) {
 	directory := maildirectory.New(f.db)
 	listener, imapListener := startLiveMailProtocols(t, f, directory)
 	configureLiveMailDirectory(t, f, ctx)
-	connection, err := smtp.Dial(listener.Addr().String())
-	check(t, err)
-	defer func() { check(t, connection.Close()) }()
-	check(t, connection.Mail("sender@example.test"))
-	check(t, connection.Rcpt("invoices@live.test"))
-	writer, err := connection.Data()
-	check(t, err)
-	_, err = writer.Write([]byte("Subject: live directory\r\n\r\noriginal bytes\r\n"))
-	check(t, err)
-	check(t, writer.Close())
-	_, err = f.mail.PublishMailboxes(ctx, 32)
+	checkLiveSMTPDirectoryChanges(t, f, listener.Addr().String())
+	_, err := f.mail.PublishMailboxes(ctx, 32)
 	check(t, err)
 	reader, err := imapclient.DialInsecure(imapListener.Addr().String(), nil)
 	check(t, err)
@@ -97,6 +88,21 @@ func TestLiveSMTPRouteAndIMAPCredentialChanges(t *testing.T) {
 		Collect(); err == nil {
 		t.Fatal("already authenticated disabled account fetched mail")
 	}
+}
+
+func checkLiveSMTPDirectoryChanges(t *testing.T, f *fixture, address string) {
+	t.Helper()
+	ctx := context.Background()
+	connection, err := smtp.Dial(address)
+	check(t, err)
+	defer func() { check(t, connection.Close()) }()
+	check(t, connection.Mail("sender@example.test"))
+	check(t, connection.Rcpt("invoices@live.test"))
+	writer, err := connection.Data()
+	check(t, err)
+	_, err = writer.Write([]byte("Subject: live directory\r\n\r\noriginal bytes\r\n"))
+	check(t, err)
+	check(t, writer.Close())
 	check(
 		t,
 		f.service.PutDomain(

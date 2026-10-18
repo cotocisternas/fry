@@ -35,17 +35,15 @@ func (p protocolCredentials) ValidateSubmission(context.Context, maildirectory.S
 	return nil
 }
 
-func mutateSubmission(ctx context.Context, t *testing.T, f *fixture, password string, enabled bool) {
+func mutateSubmission(ctx context.Context, t *testing.T, f *fixture, encodedPassword string, enabled bool) {
 	t.Helper()
 	tx, err := f.pool.Begin(ctx)
 	requireTestCondition(t, err == nil, err)
 	defer func() {
 		testCleanup(t)(tx.Rollback(ctx))
 	}()
-	if password != "" {
-		hash, e := credentials.HashPassword(password)
-		requireTestCondition(t, e == nil, e)
-		err = maildirectory.RotateSubmission(ctx, tx, f.org, "robot", hash)
+	if encodedPassword != "" {
+		err = maildirectory.RotateSubmission(ctx, tx, f.org, "robot", encodedPassword)
 	} else {
 		err = maildirectory.SetSubmissionAccess(ctx, tx, f.org, "robot", enabled)
 	}
@@ -123,9 +121,13 @@ func TestSubmissionCredentialDenialResolvesStatus(t *testing.T) {
 }
 
 func TestSubmissionCredentialRotationNewAuthentication(t *testing.T) {
+	// Prepare the replacement before opening the SMTP session or mutation transaction.
+	encoded, err := credentials.HashPassword("replacement-password")
+	requireTestCondition(t, err == nil, err)
 	f, client := senderAuthorityFixture(t)
-	mutateSubmission(t.Context(), t, f, "replacement-password", true)
+	mutateSubmission(t.Context(), t, f, encoded, true)
 	senderSMTPCode(t, client.Mail("robot@business.test"), 535)
+	testCleanup(t)(client.Close())
 	directory := maildirectory.New(f.pool)
 	{
 		_, err := directory.AuthenticateSubmission(context.Background(), "robot", "synthetic-password")
@@ -149,6 +151,7 @@ func TestSubmissionCredentialRotationNewAuthentication(t *testing.T) {
 		err = fresh.Auth(smtp.PlainAuth("", "robot", "replacement-password", "127.0.0.1"))
 		requireTestCondition(t, err == nil, err)
 	}
+	testCleanup(t)(fresh.Close())
 	p, err := directory.AuthenticateSubmission(context.Background(), "robot", "replacement-password")
 	requireTestCondition(t, (err == nil && p.Version == 2), p, err)
 }
@@ -200,7 +203,9 @@ func TestSubmissionCredentialSeedPreservesState(t *testing.T) {
 		err := d.SeedSubmission(ctx, accounts, []string{"initial-password"})
 		requireTestCondition(t, err == nil, err)
 	}
-	mutateSubmission(t.Context(), t, f, "rotated-password", true)
+	encoded, err := credentials.HashPassword("rotated-password")
+	requireTestCondition(t, err == nil, err)
+	mutateSubmission(t.Context(), t, f, encoded, true)
 	mutateSubmission(t.Context(), t, f, "", false)
 	for _, secret := range []string{"", "stale-password"} {
 		{

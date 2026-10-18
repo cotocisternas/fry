@@ -272,12 +272,12 @@ func TestSubmissionScopesRejectAmbiguityAndBounds(t *testing.T) {
 
 func TestSubmissionSeedConcurrentWithCreateAndOldSchemaFailsClosed(t *testing.T) {
 	d, org := submissionDirectory(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	encoded, err := credentials.HashPassword("created-secret")
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	a := SubmissionAccount{
 		Username:          "seed-race",
 		Organization:      org.String(),
