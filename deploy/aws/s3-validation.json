@@ -1,0 +1,471 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Disposable FRY S3 contract validation only. Deploy in sa-east-1. Retained bucket requires explicit owner cleanup after all writers stop. No production mail.",
+  "Parameters": {
+    "OperatorRoleArn": {
+      "Type": "String",
+      "AllowedPattern": "^arn:aws:iam::[0-9]{12}:role/.+$",
+      "Description": "Existing same-account operator IAM role authenticated with temporary credentials; must be allowed to assume the two resulting roles."
+    },
+    "RunSuffix": {
+      "Type": "String",
+      "AllowedPattern": "^[a-z0-9]{8,16}$",
+      "Description": "Unique lowercase suffix for this isolated validation bucket; do not reuse an existing bucket."
+    }
+  },
+  "Resources": {
+    "ValidationBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "fry-validation-${AWS::AccountId}-${AWS::Region}-${RunSuffix}"
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "purpose",
+            "Value": "fry-validation"
+          },
+          {
+            "Key": "project",
+            "Value": "FRY"
+          },
+          {
+            "Key": "run",
+            "Value": {
+              "Ref": "RunSuffix"
+            }
+          }
+        ]
+      }
+    },
+    "ProducerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "OperatorRoleArn"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:PrincipalAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Tags": [
+          {
+            "Key": "purpose",
+            "Value": "fry-validation"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "FRYValidationProducer",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "ValidationBucket",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "RetirementRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "OperatorRoleArn"
+                }
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:PrincipalAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "MaxSessionDuration": 3600,
+        "Tags": [
+          {
+            "Key": "purpose",
+            "Value": "fry-validation"
+          }
+        ],
+        "Policies": [
+          {
+            "PolicyName": "FRYValidationRetirement",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket",
+                    "s3:GetBucketVersioning",
+                    "s3:GetLifecycleConfiguration",
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketTagging"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "ValidationBucket",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ValidationBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ValidationBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "RequireTLS",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ValidationBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${ValidationBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            },
+            {
+              "Sid": "ProducerRequiresCreateCondition",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "ProducerRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+              },
+              "Condition": {
+                "Null": {
+                  "s3:if-none-match": "true"
+                }
+              }
+            },
+            {
+              "Sid": "ProducerRequiresStar",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "ProducerRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+              },
+              "Condition": {
+                "Null": {
+                  "s3:if-none-match": "false"
+                },
+                "StringNotEquals": {
+                  "s3:if-none-match": "*"
+                }
+              }
+            },
+            {
+              "Sid": "ProducerCannotUseMatch",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "ProducerRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+              },
+              "Condition": {
+                "Null": {
+                  "s3:if-match": "false"
+                }
+              }
+            },
+            {
+              "Sid": "RetirementRequiresCondition",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "RetirementRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+              },
+              "Condition": {
+                "Null": {
+                  "s3:if-none-match": "true",
+                  "s3:if-match": "true"
+                }
+              }
+            },
+            {
+              "Sid": "RetirementCreateRequiresStar",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "RetirementRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+              },
+              "Condition": {
+                "Null": {
+                  "s3:if-none-match": "false"
+                },
+                "StringNotEquals": {
+                  "s3:if-none-match": "*"
+                }
+              }
+            },
+            {
+              "Sid": "RetirementCannotCombineConditions",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": {
+                  "Fn::GetAtt": [
+                    "RetirementRole",
+                    "Arn"
+                  ]
+                }
+              },
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/packs/v1/*"
+              },
+              "Condition": {
+                "Null": {
+                  "s3:if-none-match": "false",
+                  "s3:if-match": "false"
+                }
+              }
+            },
+            {
+              "Sid": "ApplicationRolesCannotDeleteOrRetag",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": [
+                  {
+                    "Fn::GetAtt": [
+                      "ProducerRole",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "RetirementRole",
+                      "Arn"
+                    ]
+                  }
+                ]
+              },
+              "Action": [
+                "s3:DeleteObject",
+                "s3:DeleteObjectVersion",
+                "s3:PutObjectAcl",
+                "s3:PutObjectTagging",
+                "s3:DeleteObjectTagging"
+              ],
+              "Resource": {
+                "Fn::Sub": "${ValidationBucket.Arn}/*"
+              }
+            },
+            {
+              "Sid": "ApplicationRolesCannotChangeBucket",
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": [
+                  {
+                    "Fn::GetAtt": [
+                      "ProducerRole",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "RetirementRole",
+                      "Arn"
+                    ]
+                  }
+                ]
+              },
+              "Action": [
+                "s3:PutBucketVersioning",
+                "s3:PutLifecycleConfiguration",
+                "s3:PutBucketPolicy",
+                "s3:DeleteBucketPolicy",
+                "s3:PutBucketTagging",
+                "s3:PutEncryptionConfiguration",
+                "s3:PutBucketAcl",
+                "s3:PutBucketOwnershipControls",
+                "s3:PutBucketPublicAccessBlock",
+                "s3:PutReplicationConfiguration",
+                "s3:DeleteBucket"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ValidationBucket",
+                  "Arn"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "Bucket": {
+      "Value": {
+        "Ref": "ValidationBucket"
+      }
+    },
+    "Region": {
+      "Value": {
+        "Ref": "AWS::Region"
+      }
+    },
+    "ExpectedOwner": {
+      "Value": {
+        "Ref": "AWS::AccountId"
+      }
+    },
+    "ProducerRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ProducerRole",
+          "Arn"
+        ]
+      }
+    },
+    "RetirementRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "RetirementRole",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,207 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FRY São Paulo cost scenarios</title><style>
+:root{color-scheme:light dark;font-family:var(--font-sans,system-ui,sans-serif);color:var(--foreground,#202937)}body{margin:0}*{box-sizing:border-box}.eyebrow{color:var(--muted-foreground,#677080);font-size:12px;text-transform:uppercase;letter-spacing:.07em}.amount{font-size:38px;font-weight:720;letter-spacing:-1px;margin:6px 0}.amount small{font-size:16px;font-weight:450;letter-spacing:0}.intro,p{line-height:1.5;margin:8px 0 16px}.muted{color:var(--muted-foreground,#677080);font-size:13px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}label{font-size:13px;font-weight:600;display:block}input{display:block;width:100%;padding:9px;margin-top:6px;background:var(--card,#f2f5f7);color:inherit;border:1px solid var(--border,#c8cfd6);border-radius:6px;font:inherit}input:focus{outline:2px solid var(--ring,#2382c2)}.presets{display:flex;gap:8px;flex-wrap:wrap}button{cursor:pointer;padding:7px 12px;border:1px solid var(--border,#c8cfd6);background:var(--secondary,#eef2f6);color:inherit;border-radius:6px;font:inherit;font-size:13px}button:hover{border-color:var(--primary,#2382c2)}.metrics{display:flex;flex-wrap:wrap;gap:10px 24px;margin:16px 0;font-size:13px}.metrics strong{display:block;font-size:19px}.costs{width:100%;border-collapse:collapse;font-size:14px}.costs td{padding:10px 0;border-bottom:1px solid var(--border,#dce1e7);vertical-align:top}.costs td:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:12px}.bar{height:5px;background:var(--secondary,#e7edf3);border-radius:3px;width:100%;margin-top:7px;overflow:hidden}.bar i{display:block;height:100%;background:var(--chart-1,#368cc1)}details{margin-top:18px;font-size:13px;line-height:1.5}summary{cursor:pointer;font-weight:600}ul{padding-left:20px}li{margin:6px 0}a{color:var(--primary,#1678b3)}.note{border-left:3px solid var(--warning,#b67c18);padding-left:12px;margin:18px 0}.sources{font-size:12px;margin-top:16px} @media(max-width:420px){.amount{font-size:32px}.controls{gap:10px}.costs{font-size:13px}}
+</style></head><body>
+<div class="eyebrow">AWS São Paulo · sa-east-1 · USD / month</div>
+<div class="amount" aria-live="polite"><span id="subtotal"></span> <small>modeled subtotal</small></div>
+<p class="intro">An illustrative workload using public prices, <strong>not a complete bill or a capacity guarantee</strong>. AWS and external consumers are confirmed; their split and the values below are assumptions.</p>
+<div class="presets"><button type="button" data-size="100">100 KB example</button><button type="button" data-size="250">250 KB example</button><button type="button" data-size="500">500 KB example</button></div>
+<div class="controls">
+<label>Million emails / day<input id="volume" type="number" min="1" max="100" step="1" value="20"></label>
+<label>Mean complete email size · KB<input id="size" type="number" min="1" max="200000" step="1" value="250"></label>
+<label>Effective stored footprint · days<input id="days" type="number" min="1" max="3650" step="1" value="30"></label>
+<label>Downloads leaving AWS · %<input id="external" type="number" min="0" max="100" step="1" value="50"></label>
+</div>
+<p class="muted">One object and one full download per email; 30 traffic days. “Stored footprint” includes live mail plus recovery copies without double counting. Visible mail does not expire automatically.</p>
+<div class="metrics"><div><strong id="stored"></strong>average email storage</div><div><strong id="egress"></strong>external downloads / month</div></div>
+<table class="costs" aria-label="Monthly modeled costs"><tbody id="rows"></tbody></table>
+<div class="note muted"><strong>Not a ceiling:</strong> the compute/database line stays fixed as you change traffic. It has not been sized or tested for FRY, bursts, or five-minute AZ recovery. Larger or differently partitioned infrastructure may be necessary.</div>
+<details><summary>What the fixed infrastructure example includes</summary><ul>
+<li>Six m7i.2xlarge Linux workers across three zones: 48 vCPU and 192 GiB total before a failure; six 100 GiB gp3 disks.</li>
+<li>One standard-support EKS cluster; RDS PostgreSQL db.r7g.2xlarge Multi-AZ with one standby and 3 TiB gp3.</li>
+<li>Three NAT gateways’ hourly fees and six public IPv4 addresses. One NLB’s hourly fee is included in its separate line above.</li>
+<li>730 compute hours; on-demand pricing. These services, sizes, and three-zone layout are costing examples, not selected architecture.</li></ul></details>
+<details open><summary>Costs still to add</summary><p>Variable NAT processing and applicable cross-zone traffic; outbound email and relay fees; extra reads/retries, old mailbox history, logging/audit, backup excess, support, taxes, staging, and migration overlap. External IMAP collection may add substantial NAT traffic. At São Paulo’s rate, 10 TB through NAT adds approximately <strong>$930</strong> before other transfer charges.</p></details>
+<details><summary>Units and model limits</summary><p>Message KB and displayed TB are decimal. S3 storage is converted to binary billed GB. Network charges conservatively use decimal GB; reconcile actual metering in a deployment test. The shared 100 GB egress allowance is assumed available. NLB counts one incoming copy and one fetched copy through TCP listeners; connection-based charges may exceed the byte calculation. The example assumes direct SMTP ingress and S3 gateway-endpoint access, so variable collection/outbound NAT traffic is additional. S3 Standard’s built-in multi-AZ replication is already included in its price.</p></details>
+<p class="sources">Prices checked 17 Oct 2026. Official inputs: <a href="https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/sa-east-1/index.json">S3</a> · <a href="https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/sa-east-1/index.json">transfer</a> · <a href="https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/sa-east-1/index.csv">EC2</a> · <a href="https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/sa-east-1/index.json">RDS</a> · <a href="https://aws.amazon.com/eks/pricing/">EKS</a> · <a href="https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSELB/current/sa-east-1/index.json">NLB</a> · <a href="https://aws.amazon.com/vpc/pricing/">VPC</a>.</p>
+<script>
+const DATA={
+  "checked": "2026-10-17",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "rates": {
+    "hours": 730,
+    "traffic_days": 30,
+    "s3_tiers": [
+      [
+        51200,
+        0.0405
+      ],
+      [
+        512000,
+        0.039
+      ],
+      [
+        null,
+        0.037
+      ]
+    ],
+    "egress_tiers": [
+      [
+        10240,
+        0.15
+      ],
+      [
+        51200,
+        0.138
+      ],
+      [
+        153600,
+        0.126
+      ],
+      [
+        null,
+        0.114
+      ]
+    ],
+    "put": 7e-06,
+    "get": 5.6e-07,
+    "node_hour": 0.6426,
+    "nodes": 6,
+    "node_disk_gib": 100,
+    "ebs_gib_month": 0.152,
+    "eks_hour": 0.1,
+    "rds_multi_az_hour": 3.04167,
+    "rds_gib": 3072,
+    "rds_gib_month": 0.438,
+    "nlb_hour": 0.034,
+    "nlb_gb": 0.00825,
+    "nat_gateways": 3,
+    "nat_hour": 0.093,
+    "ipv4_count": 6,
+    "ipv4_hour": 0.005
+  },
+  "scenarios": [
+    {
+      "million_day": 20,
+      "mean_kb": 100,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 60.0,
+      "stored_tib": 54.569682106375694,
+      "external_decimal_tb": 30.0,
+      "components": {
+        "S3 stored messages": 2256.0948246002195,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 4249.08,
+        "NLB hour + byte dimension": 1014.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 18826.30792460022
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 75.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 10174.68,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 29505.850161500548
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 500,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 300.0,
+      "stored_tib": 272.84841053187847,
+      "external_decimal_tb": 150.0,
+      "components": {
+        "S3 stored messages": 10973.2741230011,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 19624.68,
+        "NLB hour + byte dimension": 4974.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 46879.0872230011
+    }
+  ],
+  "egress_sensitivity": [
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 0,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 0.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 0.0,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 19331.170161500548
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 75.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 10174.68,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 29505.850161500548
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 100,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 150.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 19624.68,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 38955.85016150055
+    }
+  ]
+}
+;
+const r=DATA.rates;
+function tiered(v,tiers){let result=0,prev=0;for(const [end,rate] of tiers){result+=Math.max(0,(end===null?v:Math.min(v,end))-prev)*rate;if(end===null||v<=end)break;prev=end;}return result;}
+function calculate(m,k,d,e){const n=m*1e6,month=n*r.traffic_days,stored=n*k*1000*d,bytes=month*k*1000;const costs=[
+['S3 stored messages',tiered(stored/2**30,r.s3_tiers)],
+['S3 PUT + one GET per message',month*(r.put+r.get)],
+['Internet downloads',tiered(Math.max(0,bytes*e/100/1e9-100),r.egress_tiers)],
+['NLB hourly + processed bytes',r.hours*r.nlb_hour+2*bytes/1e9*r.nlb_gb],
+['Illustrative compute + database + fixed network',r.hours*(r.nodes*r.node_hour+r.eks_hour+r.rds_multi_az_hour+r.nat_gateways*r.nat_hour+r.ipv4_count*r.ipv4_hour)+r.nodes*r.node_disk_gib*r.ebs_gib_month+r.rds_gib*r.rds_gib_month]
+];return {costs,total:costs.reduce((a,b)=>a+b[1],0),stored:stored/1e12,egress:bytes*e/100/1e12};}
+const money=v=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(v);
+const ids=['volume','size','days','external'];
+function render(){const inputs=ids.map(id=>document.getElementById(id));if(!inputs.every(i=>i.checkValidity()&&i.value!==''))return;const x=calculate(...inputs.map(i=>+i.value));document.getElementById('subtotal').textContent=money(x.total);document.getElementById('stored').textContent=x.stored.toLocaleString('en-US',{maximumFractionDigits:1})+' TB';document.getElementById('egress').textContent=x.egress.toLocaleString('en-US',{maximumFractionDigits:1})+' TB';document.getElementById('rows').replaceChildren(...x.costs.map(([name,cost])=>{let row=document.createElement('tr'),left=document.createElement('td'),right=document.createElement('td'),bar=document.createElement('div'),fill=document.createElement('i');left.textContent=name;right.textContent=money(cost);bar.className='bar';fill.style.width=(cost/x.total*100)+'%';bar.append(fill);left.append(bar);row.append(left,right);return row;}));}
+for(const id of ids)document.getElementById(id).addEventListener('input',render);
+for(const b of document.querySelectorAll('button[data-size]'))b.addEventListener('click',()=>{ids.forEach((id,i)=>document.getElementById(id).value=[20,+b.dataset.size,30,50][i]);render();});
+for(const s of [...DATA.scenarios,...DATA.egress_sensitivity]){const got=calculate(s.million_day,s.mean_kb,s.storage_days,s.external_percent);if(Math.abs(got.total-s.subtotal_usd)>0.001)throw new Error('Scenario arithmetic mismatch');}
+render();console.log('Validated six scenarios against the Python model.');
+</script></body></html>

@@ -1,0 +1,133 @@
+{
+  "scope": "bounded abstract state exploration; not production implementation, timing, disk, PostgreSQL, or S3 validation",
+  "correct_protocol": {
+    "passed": true,
+    "states": 1456,
+    "transitions": 3882,
+    "coverage": [
+      "accepted_survives_zone_loss",
+      "database_outage_after_commit",
+      "expiry_with_active_reader",
+      "explicit_degraded_acceptance",
+      "pack_retirement",
+      "smtp_success",
+      "takeover_publication"
+    ]
+  },
+  "mutation_counterexamples": {
+    "missing_attempt_guard": {
+      "passed": false,
+      "states": 204,
+      "transitions": 380,
+      "violation": "accepted live receipt has no recoverable bytes",
+      "trace": [
+        "lose AZ A",
+        "activate recorded reduced-protection profile",
+        "register attempt before byte I/O",
+        "fsync original in AZ B",
+        "abort attempt under guard",
+        "reclaim safe hot copy B",
+        "commit explicitly degraded receipt"
+      ],
+      "state": {
+        "phase": "accepted",
+        "hot": 0,
+        "proofs": 2,
+        "lost": 1,
+        "database": true,
+        "degraded": true,
+        "accepted_mode": "degraded",
+        "ack": false,
+        "job": "none",
+        "epoch": 0,
+        "published_epoch": -1,
+        "object": "absent",
+        "pinned": false
+      }
+    },
+    "missing_epoch_guard": {
+      "passed": false,
+      "states": 406,
+      "transitions": 785,
+      "violation": "stale worker published after ownership changed",
+      "trace": [
+        "register attempt before byte I/O",
+        "fsync original in AZ A",
+        "fsync original in AZ B",
+        "commit normal receipt using durability receipts",
+        "register pack and start bounded upload",
+        "lease takeover fences epoch zero",
+        "old in-flight create-only PUT completes",
+        "publish pack from epoch 0"
+      ],
+      "state": {
+        "phase": "accepted",
+        "hot": 3,
+        "proofs": 3,
+        "lost": 0,
+        "database": true,
+        "degraded": false,
+        "accepted_mode": "normal",
+        "ack": false,
+        "job": "published",
+        "epoch": 1,
+        "published_epoch": 0,
+        "object": "body",
+        "pinned": false
+      }
+    },
+    "delete_instead_of_retained_marker": {
+      "passed": false,
+      "states": 840,
+      "transitions": 1788,
+      "violation": "late upload resurrected retired message bytes",
+      "trace": [
+        "register attempt before byte I/O",
+        "fsync original in AZ A",
+        "fsync original in AZ B",
+        "commit normal receipt using durability receipts",
+        "deliver SMTP success (may have been delayed)",
+        "register pack and start bounded upload",
+        "final required reference ends",
+        "retire pack publication rights",
+        "UNSAFE delete key while old PUT may finish",
+        "old in-flight create-only PUT completes"
+      ],
+      "state": {
+        "phase": "expired",
+        "hot": 3,
+        "proofs": 3,
+        "lost": 0,
+        "database": true,
+        "degraded": false,
+        "accepted_mode": "normal",
+        "ack": true,
+        "job": "retired",
+        "epoch": 0,
+        "published_epoch": -1,
+        "object": "body",
+        "pinned": false
+      }
+    }
+  },
+  "mixed_pack": {
+    "orders_checked": 6,
+    "scope": "two-record membership snapshot and surviving reference"
+  },
+  "assumptions": [
+    "atomic durable database transactions",
+    "documented atomic conditional object writes",
+    "truthful durable byte confirmations",
+    "at most one AZ loss",
+    "actual reader handle closes when modeled close occurs"
+  ],
+  "not_tested": [
+    "real fsync/partial writes",
+    "SQL isolation/locks",
+    "S3/IAM/versioning semantics",
+    "network partitions or operator authentication",
+    "five-minute recovery",
+    "24-hour cleanup liveness",
+    "throughput, memory, and cost"
+  ]
+}

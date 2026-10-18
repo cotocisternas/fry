@@ -1,0 +1,7 @@
+{
+  "region": "sa-east-1",
+  "bucket": "fry-validation-replace-with-stack-output",
+  "expected_bucket_owner": "000000000000",
+  "producer_profile": "fry-validation-producer",
+  "retirement_profile": "fry-validation-retirement"
+}

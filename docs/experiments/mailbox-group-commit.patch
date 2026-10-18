@@ -1,0 +1,681 @@
+--- a/internal/receiptstore/mailbox_linux.go
++++ b/internal/receiptstore/mailbox_linux.go
+@@ -208,28 +208,53 @@
+ 	}
+ 	count := 0
+ 	var firstError error
+-	for _, w := range batch {
+-		published, e := s.publishMailbox(ctx, w.o, w.r, w.i)
+-		if e != nil {
+-			if firstError == nil {
+-				firstError = e
+-			}
+-			code := "storage_error"
+-			if errors.Is(e, ErrNotFound) {
+-				code = "destination_unavailable"
+-			}
+-			if errors.Is(e, ErrExpired) {
+-				code = "receipt_expired"
+-			}
+-			_, retryErr := s.db.pool.Exec(ctx, `UPDATE fry_work SET available_at=clock_timestamp()+interval '1 minute',failures=failures+1,last_error=$3 WHERE receipt=$1 AND inbox=$2`, w.r.String(), w.i.String(), code)
+-			if retryErr != nil {
+-				return count, errors.Join(firstError, retryErr)
+-			}
+-			continue
+-		}
+-		if published {
+-			count++
+-		}
++	for offset := 0; offset < len(batch); {
++		end := offset + 1
++		for end < len(batch) && end-offset < mailboxPublicationGroupLimit && batch[end].i == batch[offset].i && batch[end].o == batch[offset].o {
++			end++
++		}
++		group := batch[offset:end]
++		if len(group) > 1 {
++			tx, err := s.db.begin(ctx)
++			if err != nil {
++				return count, errors.Join(firstError, err)
++			}
++			outcome, err := publishMailboxGroupTx(ctx, tx, group)
++			if err != nil {
++				return count, errors.Join(firstError, err)
++			}
++			if !outcome.fallback {
++				count += outcome.published
++				offset = end
++				continue
++			}
++		}
++		// Eligibility/helper failure reached here only after a confirmed group
++		// rollback. Preserve the existing per-item publication/backoff path.
++		for _, w := range group {
++			published, e := s.publishMailbox(ctx, w.o, w.r, w.i)
++			if e != nil {
++				if firstError == nil {
++					firstError = e
++				}
++				code := "storage_error"
++				if errors.Is(e, ErrNotFound) {
++					code = "destination_unavailable"
++				}
++				if errors.Is(e, ErrExpired) {
++					code = "receipt_expired"
++				}
++				_, retryErr := s.db.pool.Exec(ctx, `UPDATE fry_work SET available_at=clock_timestamp()+interval '1 minute',failures=failures+1,last_error=$3 WHERE receipt=$1 AND inbox=$2`, w.r.String(), w.i.String(), code)
++				if retryErr != nil {
++					return count, errors.Join(firstError, retryErr)
++				}
++				continue
++			}
++			if published {
++				count++
++			}
++		}
++		offset = end
+ 	}
+ 	return count, firstError
+ }
+@@ -306,6 +331,83 @@
+ 		return nil, rowErr
+ 	}
+ 	return batch, nil
++}
++
++const mailboxPublicationGroupLimit = 16
++
++type mailboxGroupResult struct {
++	published int
++	fallback  bool
++}
++
++// publishMailboxGroupTx owns tx. It holds every distinct receipt guard in ID
++// order before touching any folder, then allocates UIDs in original queue order.
++// Only an acknowledged precommit rollback permits individual fallback. Once
++// Commit is attempted, any error leaves zero known group count and no fallback.
++func publishMailboxGroupTx(ctx context.Context, tx pgx.Tx, group []mailboxWork) (mailboxGroupResult, error) {
++	defer rollback(tx)
++	fallback := func(cause error) (mailboxGroupResult, error) {
++		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++		err := tx.Rollback(cleanup)
++		cancel()
++		if err != nil {
++			return mailboxGroupResult{}, errors.Join(ErrUncertain, cause, err)
++		}
++		if err = ctx.Err(); err != nil {
++			return mailboxGroupResult{}, err
++		}
++		return mailboxGroupResult{fallback: true}, nil
++	}
++	if len(group) < 2 || len(group) > mailboxPublicationGroupLimit {
++		return fallback(ErrConflict)
++	}
++	unique := map[ID]bool{}
++	var receipts []ID
++	for _, w := range group {
++		if w.o != group[0].o || w.i != group[0].i {
++			return fallback(ErrConflict)
++		}
++		if !unique[w.r] {
++			unique[w.r] = true
++			receipts = append(receipts, w.r)
++		}
++	}
++	sort.Slice(receipts, func(i, j int) bool { return receipts[i].String() < receipts[j].String() })
++	for _, receipt := range receipts {
++		if _, err := lockReceipt(ctx, tx, group[0].o, receipt); err != nil {
++			return fallback(err)
++		}
++	}
++	// Work metadata is authoritative only under its receipt guard. A disappeared
++	// item remains an idempotent no-op; explicit-folder work uses the old path.
++	// Flags/internal dates are preserved by the unchanged publication helper.
++	for _, w := range group {
++		var folder *string
++		err := tx.QueryRow(ctx, `SELECT folder FROM fry_work WHERE receipt=$1 AND inbox=$2`, w.r.String(), w.i.String()).Scan(&folder)
++		if errors.Is(err, pgx.ErrNoRows) {
++			continue
++		}
++		if err != nil {
++			return fallback(err)
++		}
++		if folder != nil {
++			return fallback(ErrConflict)
++		}
++	}
++	published := 0
++	for _, w := range group {
++		added, err := publishMailboxInTransaction(ctx, tx, w.o, w.r, w.i, false)
++		if err != nil {
++			return fallback(err)
++		}
++		if added {
++			published++
++		}
++	}
++	if err := commit(ctx, tx); err != nil {
++		return mailboxGroupResult{}, err
++	}
++	return mailboxGroupResult{published: published}, nil
+ }
+ 
+ func (s *Store) publishMailbox(ctx context.Context, org, receipt, inbox ID) (bool, error) {
+--- /dev/null
++++ b/internal/receiptstore/mailbox_batch_linux_test.go
+@@ -0,0 +1,516 @@
++//go:build linux
++
++package receiptstore
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"io"
++	"reflect"
++	"sort"
++	"sync"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgconn"
++)
++
++func batchQueue(t *testing.T, f *fixture, inbox ID, n int) []Receipt {
++	t.Helper()
++	if err := f.s.EnsureInbox(context.Background(), f.org, inbox); err != nil {
++		t.Fatal(err)
++	}
++	env := Envelope{Organization: f.org, MailFrom: "sender@example.test", Destinations: []Destination{{Inbox: inbox, Recipients: []string{"recipient@example.test"}}}}
++	var receipts []Receipt
++	for i := 0; i < n; i++ {
++		receipts = append(receipts, accept(t, f.s, newID(t), env, fmt.Sprintf("original%d", i)))
++	}
++	return receipts
++}
++func batchWork(f *fixture, inbox ID, receipts []Receipt) []mailboxWork {
++	work := make([]mailboxWork, len(receipts))
++	for i, r := range receipts {
++		work[i] = mailboxWork{r: r.ID, i: inbox, o: f.org}
++	}
++	return work
++}
++func batchWantOwnership(t *testing.T, f *fixture, memberships, pending int64) {
++	t.Helper()
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_mail`); n != memberships {
++		t.Fatal("membership count", n, memberships)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_reference WHERE kind='mailbox' AND expires_at IS NULL`); n != memberships {
++		t.Fatal("visible reference count", n, memberships)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_work`); n != pending {
++		t.Fatal("pending work count", n, pending)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_reference WHERE kind='pending-mailbox' AND (expires_at IS NULL OR expires_at>clock_timestamp())`); n != pending {
++		t.Fatal("pending reference count", n, pending)
++	}
++}
++func batchWaitQuery(t *testing.T, f *fixture, fragment string) {
++	t.Helper()
++	deadline := time.Now().Add(3 * time.Second)
++	for scalar(t, f.pool, `SELECT count(*) FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock' AND position($2 in query)>0`, f.pool.Config().ConnConfig.RuntimeParams["application_name"], fragment) == 0 {
++		if time.Now().After(deadline) {
++			t.Fatal("publication did not reach held guard", fragment)
++		}
++		time.Sleep(5 * time.Millisecond)
++	}
++}
++func TestMailboxBatchBoundOrderAndMetadata(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	receipts := batchQueue(t, f, inbox, 40)
++	// Queue order deliberately opposes receipt lock order.
++	sort.Slice(receipts, func(i, j int) bool { return receipts[i].ID.String() > receipts[j].ID.String() })
++	base := time.Now().Add(-time.Hour)
++	for i, r := range receipts {
++		execSQL(t, f.pool, `UPDATE fry_work SET available_at=$2 WHERE receipt=$1`, r.ID.String(), base.Add(time.Duration(i)*time.Millisecond))
++	}
++	custom := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
++	// Real accepted default-INBOX work can contain flags and internal_date; grouping
++	// must preserve them even though the folder selector itself is NULL.
++	flagged := Envelope{Organization: f.org, MailFrom: "sender@example.test", Destinations: []Destination{{Inbox: inbox, Recipients: []string{"recipient@example.test"}, Flags: []string{"\\Seen", "Business"}, InternalDate: custom}}}
++	last := accept(t, f.s, newID(t), flagged, "flagged original")
++	receipts = append(receipts, last)
++	if n, err := f.s.PublishMailboxes(ctx, 64); n != 41 || err != nil {
++		t.Fatal(n, err)
++	}
++	folder, mail, err := f.s.Mailbox(ctx, f.org, inbox, "INBOX")
++	if err != nil || len(mail) != 41 || folder.UIDNext != 42 {
++		t.Fatal(folder, len(mail), err)
++	}
++	for i, m := range mail {
++		if m.Receipt != receipts[i].ID || m.UID != uint32(i+1) {
++			t.Fatal("selection order changed", i, m)
++		}
++		date := receipts[i].ReceivedAt
++		if i == 40 {
++			date = custom
++			if !reflect.DeepEqual(m.Flags, []string{"\\Seen", "business"}) {
++				t.Fatal(m.Flags)
++			}
++		}
++		if !m.Date.Equal(date) {
++			t.Fatal("date changed", i, m.Date, date)
++		}
++	}
++	rows, err := f.pool.Query(ctx, `SELECT count(*) FROM fry_mail GROUP BY xmin ORDER BY min(uid)`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer rows.Close()
++	var groups []int
++	for rows.Next() {
++		var n int
++		if err = rows.Scan(&n); err != nil {
++			t.Fatal(err)
++		}
++		groups = append(groups, n)
++	}
++	if err = rows.Err(); err != nil || !reflect.DeepEqual(groups, []int{16, 16, 9}) {
++		t.Fatal("group transaction bound", groups, err)
++	}
++	batchWantOwnership(t, f, 41, 0)
++}
++func TestMailboxBatchReleasedMiddleFallsBackWithoutUIDGaps(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	receipts := batchQueue(t, f, inbox, 3)
++	if err := f.s.ReleaseReference(ctx, f.org, receipts[1].ID, Reference{Kind: "pending-mailbox", Key: inbox.String()}); err != nil {
++		t.Fatal(err)
++	}
++	if n, err := f.s.PublishMailboxes(ctx, 16); n != 2 || !errors.Is(err, ErrExpired) {
++		t.Fatal(n, err)
++	}
++	folder, mail, err := f.s.Mailbox(ctx, f.org, inbox, "INBOX")
++	if err != nil || len(mail) != 2 || folder.UIDNext != 3 || mail[0].Receipt != receipts[0].ID || mail[1].Receipt != receipts[2].ID || mail[0].UID != 1 || mail[1].UID != 2 {
++		t.Fatal(folder, mail, err)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_work WHERE receipt=$1 AND failures=1 AND last_error='receipt_expired' AND available_at>clock_timestamp()`, receipts[1].ID.String()); n != 1 {
++		t.Fatal("poison debt/backoff", n)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_reference_release WHERE kind='pending-mailbox'`); n != 3 {
++		t.Fatal("rollback duplicated ownership", n)
++	}
++}
++func TestMailboxBatchUIDExhaustionPreservesHealthyPrefix(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	receipts := batchQueue(t, f, inbox, 2)
++	execSQL(t, f.pool, `UPDATE fry_folder SET uidnext=4294967295 WHERE inbox=$1 AND name='INBOX'`, inbox.String())
++	if n, err := f.s.PublishMailboxes(ctx, 16); n != 1 || err == nil {
++		t.Fatal(n, err)
++	}
++	folder, mail, err := f.s.Mailbox(ctx, f.org, inbox, "INBOX")
++	if err != nil || len(mail) != 1 || folder.UIDNext != 4294967296 || mail[0].UID != 4294967295 || mail[0].Receipt != receipts[0].ID {
++		t.Fatal(folder, mail, err)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_work WHERE receipt=$1 AND failures=1`, receipts[1].ID.String()); n != 1 {
++		t.Fatal("failed suffix not deferred", n)
++	}
++}
++
++type mailboxReplyLossTx struct {
++	pgx.Tx
++	commitLoss, rollbackLoss bool
++}
++
++func (tx mailboxReplyLossTx) Commit(ctx context.Context) error {
++	err := tx.Tx.Commit(ctx)
++	if err == nil && tx.commitLoss {
++		return io.ErrUnexpectedEOF
++	}
++	return err
++}
++func (tx mailboxReplyLossTx) Rollback(ctx context.Context) error {
++	err := tx.Tx.Rollback(ctx)
++	if err == nil && tx.rollbackLoss {
++		return io.ErrUnexpectedEOF
++	}
++	return err
++}
++func TestMailboxBatchLostCommitReplyIsUncertainAndReplaySafe(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	receipts := batchQueue(t, f, inbox, 3)
++	tx, err := f.s.db.begin(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	outcome, err := publishMailboxGroupTx(ctx, mailboxReplyLossTx{Tx: tx, commitLoss: true}, batchWork(f, inbox, receipts))
++	if !errors.Is(err, ErrUncertain) || outcome.published != 0 || outcome.fallback {
++		t.Fatal("lost reply invented count/fallback", outcome, err)
++	}
++	// The wrapper really committed PostgreSQL before returning a synthetic reply
++	// loss. It models the transaction seam, not a dropped network packet.
++	batchWantOwnership(t, f, 3, 0)
++	if n, err := f.s.PublishMailboxes(ctx, 16); n != 0 || err != nil {
++		t.Fatal("replay duplicated committed group", n, err)
++	}
++}
++func TestMailboxBatchRollbackReplyLossDoesNotFallback(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	receipts := batchQueue(t, f, inbox, 3)
++	if err := f.s.ReleaseReference(ctx, f.org, receipts[1].ID, Reference{Kind: "pending-mailbox", Key: inbox.String()}); err != nil {
++		t.Fatal(err)
++	}
++	tx, err := f.s.db.begin(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	outcome, err := publishMailboxGroupTx(ctx, mailboxReplyLossTx{Tx: tx, rollbackLoss: true}, batchWork(f, inbox, receipts))
++	if !errors.Is(err, ErrUncertain) || outcome.published != 0 || outcome.fallback {
++		t.Fatal("unconfirmed rollback allowed fallback", outcome, err)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_mail`); n != 0 {
++		t.Fatal("rolled-back prefix escaped", n)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_work WHERE failures<>0`); n != 0 {
++		t.Fatal("uncertain group was backed off", n)
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_work`); n != 3 {
++		t.Fatal("uncertain rollback lost debt", n)
++	}
++}
++func TestMailboxBatchCommitFailureDoesNotFallbackOrBackoff(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	batchQueue(t, f, inbox, 3)
++	execSQL(t, f.pool, `CREATE FUNCTION fail_mailbox_group_commit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic deferred publication failure'; END $$`)
++	execSQL(t, f.pool, `CREATE CONSTRAINT TRIGGER fail_mailbox_group_commit AFTER INSERT ON fry_mail DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fail_mailbox_group_commit()`)
++	if n, err := f.s.PublishMailboxes(ctx, 16); n != 0 || !errors.Is(err, ErrUncertain) {
++		t.Fatal(n, err)
++	}
++	batchWantOwnership(t, f, 0, 3)
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_work WHERE failures<>0`); n != 0 {
++		t.Fatal("commit error caused blanket backoff", n)
++	}
++	execSQL(t, f.pool, `DROP TRIGGER fail_mailbox_group_commit ON fry_mail`)
++	if n, err := f.s.PublishMailboxes(ctx, 16); n != 3 || err != nil {
++		t.Fatal(n, err)
++	}
++}
++
++type mailboxPausedCommitTx struct {
++	pgx.Tx
++	entered chan struct{}
++	release <-chan struct{}
++}
++
++func (tx mailboxPausedCommitTx) Commit(ctx context.Context) error {
++	close(tx.entered)
++	select {
++	case <-tx.release:
++		return tx.Tx.Commit(ctx)
++	case <-ctx.Done():
++		return ctx.Err()
++	}
++}
++func TestMailboxBatchVisibilityIsWholeBeforeAndAfterCommit(t *testing.T) {
++	f := setup(t)
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	inbox := newID(t)
++	receipts := batchQueue(t, f, inbox, 3)
++	observer, err := f.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer observer.Rollback(context.Background())
++	var count int
++	if err = observer.QueryRow(ctx, `SELECT count(*) FROM fry_mail`).Scan(&count); err != nil || count != 0 {
++		t.Fatal(count, err)
++	}
++	tx, err := f.s.db.begin(ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	entered, release := make(chan struct{}), make(chan struct{})
++	allow := sync.OnceFunc(func() { close(release) })
++	defer allow()
++	type result struct {
++		outcome mailboxGroupResult
++		err     error
++	}
++	done := make(chan result, 1)
++	go func() {
++		outcome, err := publishMailboxGroupTx(ctx, mailboxPausedCommitTx{Tx: tx, entered: entered, release: release}, batchWork(f, inbox, receipts))
++		done <- result{outcome, err}
++	}()
++	select {
++	case <-entered:
++	case <-ctx.Done():
++		t.Fatal("group did not reach commit")
++	}
++	if n := scalar(t, f.pool, `SELECT count(*) FROM fry_mail`); n != 0 {
++		t.Fatal("uncommitted prefix visible", n)
++	}
++	allow()
++	select {
++	case result := <-done:
++		if result.err != nil || result.outcome.published != 3 {
++			t.Fatal(result)
++		}
++	case <-ctx.Done():
++		t.Fatal("group did not commit")
++	}
++	if err = observer.QueryRow(ctx, `SELECT count(*) FROM fry_mail`).Scan(&count); err != nil || count != 0 {
++		t.Fatal("repeatable-read snapshot changed", count, err)
++	}
++	batchWantOwnership(t, f, 3, 0)
++}
++func TestMailboxBatchConcurrentDuplicateWorkers(t *testing.T) {
++	f := setup(t)
++	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++	defer cancel()
++	inbox := newID(t)
++	batchQueue(t, f, inbox, 48)
++	independent, err := New(ctx, f.pool, f.members, f.s.db.opts)
++	if err != nil {
++		t.Fatal(err)
++	}
++	stores := []*Store{f.s, independent}
++	var wg sync.WaitGroup
++	var published atomic.Int64
++	for worker := 0; worker < 4; worker++ {
++		wg.Add(1)
++		go func(index int) {
++			defer wg.Done()
++			for i := 0; i < 6; i++ {
++				n, err := stores[index%2].PublishMailboxes(ctx, 32)
++				if err != nil {
++					t.Error(err)
++					return
++				}
++				published.Add(int64(n))
++			}
++		}(worker)
++	}
++	wg.Wait()
++	if published.Load() != 48 {
++		t.Fatal("duplicate count", published.Load())
++	}
++	folder, mail, err := f.s.Mailbox(ctx, f.org, inbox, "INBOX")
++	if err != nil || len(mail) != 48 || folder.UIDNext != 49 {
++		t.Fatal(folder, len(mail), err)
++	}
++	for i, m := range mail {
++		if m.UID != uint32(i+1) {
++			t.Fatal("UID gap", m)
++		}
++	}
++	batchWantOwnership(t, f, 48, 0)
++}
++
++func TestMailboxBatchPrelocksReceiptsBeforeFolderAndOverlappingMutation(t *testing.T) {
++	for _, operation := range []string{"expunge", "copy", "delete"} {
++		t.Run(operation, func(t *testing.T) {
++			f := setup(t)
++			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
++			defer cancel()
++			source, target := newID(t), newID(t)
++			for _, inbox := range []ID{source, target} {
++				if err := f.s.EnsureInbox(ctx, f.org, inbox); err != nil {
++					t.Fatal(err)
++				}
++			}
++			env := Envelope{Organization: f.org, MailFrom: "sender@example.test", Destinations: []Destination{{Inbox: source, Recipients: []string{"source@example.test"}}, {Inbox: target, Recipients: []string{"target@example.test"}}}}
++			var receipts []Receipt
++			for i := 0; i < 3; i++ {
++				r := accept(t, f.s, newID(t), env, "original shared with mutable source mailbox")
++				receipts = append(receipts, r)
++				if published, err := f.s.publishMailbox(ctx, f.org, r.ID, source); err != nil || !published {
++					t.Fatal(published, err)
++				}
++			}
++			sort.Slice(receipts, func(i, j int) bool { return receipts[i].ID.String() > receipts[j].ID.String() })
++			base := time.Now().Add(-time.Hour)
++			for i, r := range receipts {
++				execSQL(t, f.pool, `UPDATE fry_work SET available_at=$3 WHERE receipt=$1 AND inbox=$2`, r.ID.String(), target.String(), base.Add(time.Duration(i)*time.Millisecond))
++			}
++			uids := []uint32{1, 2, 3}
++			switch operation {
++			case "expunge":
++				if err := f.s.ChangeFlags(ctx, f.org, source, "INBOX", uids, "add", []string{"\\Deleted"}); err != nil {
++					t.Fatal(err)
++				}
++			case "copy":
++				if err := f.s.CreateFolder(ctx, f.org, source, "Archive"); err != nil {
++					t.Fatal(err)
++				}
++			case "delete":
++				if err := f.s.CreateFolder(ctx, f.org, source, "DeleteMe"); err != nil {
++					t.Fatal(err)
++				}
++				if _, err := f.s.CopyMail(ctx, f.org, source, "INBOX", "DeleteMe", uids, false); err != nil {
++					t.Fatal(err)
++				}
++			}
++			targetFolder, _, err := f.s.Mailbox(ctx, f.org, target, "INBOX")
++			if err != nil {
++				t.Fatal(err)
++			}
++			holder, err := f.pool.Begin(ctx)
++			if err != nil {
++				t.Fatal(err)
++			}
++			defer holder.Rollback(context.Background())
++			if _, err = holder.Exec(ctx, `SELECT id FROM fry_folder WHERE id=$1 FOR UPDATE`, targetFolder.ID.String()); err != nil {
++				t.Fatal(err)
++			}
++			type result struct {
++				n   int
++				err error
++			}
++			published := make(chan result, 1)
++			go func() { n, err := f.s.PublishMailboxes(ctx, 16); published <- result{n, err} }()
++			batchWaitQuery(t, f, "FOR UPDATE OF f")
++			// Each NOWAIT probe uses its own transaction: a lock error aborts that probe.
++			// All receipt guards must already be held while the group waits for INBOX.
++			for _, r := range receipts {
++				probe, err := f.pool.Begin(ctx)
++				if err != nil {
++					t.Fatal(err)
++				}
++				_, probeErr := probe.Exec(ctx, `SELECT id FROM fry_receipt WHERE id=$1 FOR UPDATE NOWAIT`, r.ID.String())
++				probe.Rollback(context.Background())
++				var pgErr *pgconn.PgError
++				if !errors.As(probeErr, &pgErr) || pgErr.Code != "55P03" {
++					t.Fatal("folder acquired before every receipt guard", r.ID, probeErr)
++				}
++			}
++			mutated := make(chan error, 1)
++			go func() {
++				var err error
++				switch operation {
++				case "expunge":
++					_, err = f.s.Expunge(ctx, f.org, source, "INBOX", uids)
++				case "copy":
++					_, err = f.s.CopyMail(ctx, f.org, source, "INBOX", "Archive", uids, false)
++				case "delete":
++					err = f.s.DeleteFolder(ctx, f.org, source, "DeleteMe")
++				}
++				mutated <- err
++			}()
++			batchWaitQuery(t, f, "SELECT lifecycle FROM fry_receipt")
++			if err = holder.Rollback(ctx); err != nil {
++				t.Fatal(err)
++			}
++			select {
++			case result := <-published:
++				if result.n != 3 || result.err != nil {
++					t.Fatal(result)
++				}
++			case <-ctx.Done():
++				t.Fatal("publication deadlocked with mailbox mutation")
++			}
++			select {
++			case err := <-mutated:
++				if err != nil {
++					t.Fatal(err)
++				}
++			case <-ctx.Done():
++				t.Fatal("mailbox mutation deadlocked with publication")
++			}
++			_, mail, err := f.s.Mailbox(ctx, f.org, target, "INBOX")
++			if err != nil || len(mail) != 3 {
++				t.Fatal(mail, err)
++			}
++			for i, m := range mail {
++				if m.UID != uint32(i+1) || m.Receipt != receipts[i].ID {
++					t.Fatal("lock order changed publication order", i, m)
++				}
++			}
++			memberships := int64(6)
++			if operation == "expunge" {
++				memberships = 3
++			}
++			if operation == "copy" {
++				memberships = 9
++			}
++			batchWantOwnership(t, f, memberships, 0)
++		})
++	}
++}
++func TestMailboxBatchExplicitFolderUsesIndividualPath(t *testing.T) {
++	f := setup(t)
++	ctx := context.Background()
++	inbox := newID(t)
++	if err := f.s.EnsureInbox(ctx, f.org, inbox); err != nil {
++		t.Fatal(err)
++	}
++	if err := f.s.CreateFolder(ctx, f.org, inbox, "Explicit"); err != nil {
++		t.Fatal(err)
++	}
++	folder, _, err := f.s.Mailbox(ctx, f.org, inbox, "Explicit")
++	if err != nil {
++		t.Fatal(err)
++	}
++	env := Envelope{Organization: f.org, MailFrom: "sender@example.test", Destinations: []Destination{{Inbox: inbox, Folder: folder.ID, Recipients: []string{"recipient@example.test"}}}}
++	for i := 0; i < 2; i++ {
++		accept(t, f.s, newID(t), env, "explicit folder publication remains individual")
++	}
++	if n, err := f.s.PublishMailboxes(ctx, 16); n != 2 || err != nil {
++		t.Fatal(n, err)
++	}
++	if n := scalar(t, f.pool, `SELECT count(DISTINCT xmin::text) FROM fry_mail`); n != 2 {
++		t.Fatal("explicit folder used group commit", n)
++	}
++	_, mail, err := f.s.Mailbox(ctx, f.org, inbox, "Explicit")
++	if err != nil || len(mail) != 2 {
++		t.Fatal(mail, err)
++	}
++}

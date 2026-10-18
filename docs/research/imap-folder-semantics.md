@@ -1,0 +1,45 @@
+# IMAP folder identity, copying, and renaming
+
+Investigated 2026-10-17 against RFCs and the local `third_party/go-imap` copy of `github.com/emersion/go-imap/v2 v2.0.0-beta.8` (upstream commit `7ac47a9cfd9a06ff5f3bdee52d7420137f023a1e`, MIT). This is implementation guidance, not a conformance result. FRY's initial implementation rejects same-folder COPY/MOVE, subtree RENAME, and INBOX RENAME; implementation work can advance independently of this research snapshot. [Pinned upstream](https://github.com/emersion/go-imap/tree/7ac47a9cfd9a06ff5f3bdee52d7420137f023a1e), [store](../../internal/receiptstore/mailbox_linux.go), [adapter](../../internal/imapserver/server.go), [session views](../../internal/imapserver/view.go).
+
+## COPY and MOVE into the selected folder
+
+MOVE to the selected mailbox is explicitly allowed when COPY to that mailbox is allowed. This is conditional permission, not an unconditional requirement to implement self-COPY. MOVE creates destination messages with new UIDs and expunges originals; it is not a no-op. It must not expunge unrelated messages already marked Deleted or expose an intermediate Deleted flag. Individual messages must not be lost or duplicated across source/destination on partial failure. [RFC 6851 §3.3](https://www.rfc-editor.org/rfc/rfc6851.html#section-3.3).
+
+COPY should preserve flags and internal dates. Missing destinations normally produce NO/TRYCREATE, rather than implicit creation. Unsuccessful COPY must restore destination state. Nonexistent UIDs are ignored. [RFC 3501 §6.4.7–6.4.8](https://www.rfc-editor.org/rfc/rfc3501.html#section-6.4.7).
+
+**FRY implementation:** retain the existing fixed source-message snapshot; allocate new UIDs under one folder guard when source equals destination; deduplicate lock IDs. Insert new receipt references before releasing originals for MOVE. Do not rescan `1:*` after insertion. Whole-batch SQL atomicity is a useful stronger implementation property. Never reset UIDNEXT when MOVE empties a folder. Return nil CopyData for an empty match: the pinned writer serializes any nonnil CopyData, so empty UID sets otherwise form an invalid COPYUID response. The MOVE writer requires copy information before expunge responses. [Store transaction](../../internal/receiptstore/mailbox_linux.go), [COPY writer](../../third_party/go-imap/imapserver/copy.go), [MOVE writer](../../third_party/go-imap/imapserver/move.go).
+
+**EXAMINE correction:** an earlier research message recommended rejecting COPY into the examined mailbox. That recommendation is withdrawn: no COPY-specific prohibition was established. EXAMINE establishes read-only selected access; it does not change the mailbox's authorization policy globally. The ACL specification distinguishes destination insertion permission for APPEND/COPY from source read permission and flag/deletion permissions. This distinction informs FRY's implementation; it does not mean FRY implements the ACL extension. Keep COPY/APPEND destination authorization independent of the selected read-only flag, while rejecting selected-source mutations such as STORE, EXPUNGE, and MOVE and suppressing implicit Seen changes. Test EXAMINE plus self-COPY explicitly; do not describe a blanket prohibition as an RFC requirement. [RFC 3501 §6.3.2](https://www.rfc-editor.org/rfc/rfc3501.html#section-6.3.2), [RFC 4314 §2.1 and §4](https://www.rfc-editor.org/rfc/rfc4314.html#section-2.1).
+
+## Hierarchy and INBOX
+
+RENAME errors for nonexistent source or existing destination. Inferiors must move with an ordinary rename; missing destination ancestors should be created. The RFC example explicitly renames a nonselectable parent and its selectable child. INBOX is special: move its messages, leave INBOX empty, and leave its descendants unchanged. Tagged NO refusal is acknowledged; BAD is inappropriate. Rename does not transfer original-name subscriptions; cross-session LIST/OLDNAME notification is optional. [RFC 9051 §6.3.6](https://www.rfc-editor.org/rfc/rfc9051.html#section-6.3.6).
+
+**FRY proposal:** use the inbox namespace guard for discovery, collision checks, and the entire subtree rename. Lock affected immutable folder IDs in the existing global order. Check every rewritten name for collisions and length limits before changes; avoid SQL LIKE wildcard interpretation for `%`/`_`. Reject attempts to move a tree inside itself. Preserve IDs and memberships for ordinary renames. An absent physical parent row with children can be represented as a virtual Noselect hierarchy entry; then rename that subtree. This is a proposed representation, not permission to succeed for a truly absent name. LIST must expose the same hierarchy model that RENAME accepts.
+
+Treat INBOX rename as a separate receipt-reference transaction, not the ordinary name rewrite. A practical FRY choice is to keep INBOX's ID/UIDVALIDITY/UIDNEXT, create a fresh destination identity, copy memberships with fresh destination UIDs, and remove the old memberships atomically. Existing selected INBOX sessions then observe removals and remain attached to INBOX. This choice needs tests and documentation before enabling INBOX rename; retain explicit tagged NO until implemented. No COPYUID mapping is prescribed for RENAME.
+
+## Names, subscriptions, and selected sessions
+
+For rev1, removing a mailbox must not automatically remove its subscription. SUBSCRIBE may validate existence when adding a name. RFC 9051 changes the preservation language to SHOULD NOT and explicitly allows successful repeated UNSUBSCRIBE. [RFC 3501 §6.3.6 and §6.3.9](https://www.rfc-editor.org/rfc/rfc3501.html#section-6.3.6), [RFC 9051 §6.3.7–6.3.8](https://www.rfc-editor.org/rfc/rfc9051.html#section-6.3.7).
+
+**FRY proposal:** store subscriptions independently as `(subscription scope, mailbox name)`, not a boolean attached to a folder row. Rename X to Y leaves X subscribed; subscribing Y is a separate operation. Deleting X leaves its subscription addressable through LSUB and UNSUBSCRIBE. Decide explicitly whether FRY's shared mailbox credentials also share subscriptions.
+
+The highest-used UID for an old name must remain protected against reuse, or a new incarnation must receive a different UIDVALIDITY. UIDVALIDITY must increase when previously persistent UIDs stop being persistent. [RFC 3501 §2.3.1.1 and §6.3.5](https://www.rfc-editor.org/rfc/rfc3501.html#section-2.3.1.1).
+
+**FRY proposal:** bind selected sessions to immutable folder identity and UIDVALIDITY, never repeatedly resolve the original selected name. All selected reads and mutations must use that identity through their SQL guard; resolving the ID to a name and then using a name-based mutation still races. Another session may rename A to B and create a new A: the first session must never modify the new A. Ordinary rename should retain live-folder UIDs; name reuse must be checked against historical UIDVALIDITY, including renaming an older folder onto a previously used name. The global allocation sequence helps new folders but alone does not prove this latter case. If the selected identity is deleted, fail or close according to an explicit protocol policy; do not silently rebind. The RFC does not prescribe FRY's internal identity or broadcasting design.
+
+## Focused regression tests
+
+- Same-folder COPY/MOVE: original bytes/date/flags preserved; fresh UIDs; finite `1:*`; correct COPYUID; no-op unknown UID without empty COPYUID; unrelated Deleted messages survive MOVE; two sessions observe valid sequence changes.
+- EXAMINE: STORE/EXPUNGE/MOVE cannot mutate source; PEEK/non-PEEK do not change Seen; independently authorized APPEND/COPY destination behavior is explicit.
+- Rename a folder selected in two sessions, recreate the original name, then FETCH/SEARCH/STORE/COPY/MOVE/EXPUNGE through both original selections; only the original folder identity is affected. Repeat with rename racing mutation and deletion/recreation.
+- Nested and virtual-parent renames; missing destination ancestors; sibling prefix names; `%` and `_`; destination collisions; self-descendant destination; transaction rollback; tenant isolation.
+- Subscriptions survive ordinary/subtree rename and deletion by old name; unsubscribing a missing mailbox works; LIST/LSUB agree with the chosen hierarchy representation.
+- INBOX rename, once implemented: destination receives all messages; INBOX remains accessible and empty without UID reuse; INBOX children unchanged; selected observers see consistent updates.
+- Restart after rename/recreation and reuse of previously occupied destination names: verify UID/UIDVALIDITY history and no client-cache aliasing.
+
+## Legacy listing follow-up
+
+Legacy LSUB with a percent wildcard must return matching unsubscribed parent names as Noselect when subscribed descendants exist. This differs from merely filtering LIST to subscribed names. Empty-pattern LIST reports the hierarchy separator/root. FRY exposes the existing writer's LSUB command identity with a small isolated accessor so it can implement this distinction without altering client options. [RFC 3501 §6.3.8–6.3.9](https://www.rfc-editor.org/rfc/rfc3501.html#section-6.3.9).

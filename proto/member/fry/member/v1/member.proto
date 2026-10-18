@@ -1,0 +1,89 @@
+syntax = "proto3";
+package fry.member.v1;
+option go_package = "github.com/cotocisternas/fry/gen/member/go/fry/member/v1;memberv1";
+
+// MemberService is private to pinned, mutually authenticated internal peers.
+service MemberService {
+  rpc Identity(IdentityRequest) returns (IdentityResponse);
+  rpc Write(stream WriteRequest) returns (WriteResponse);
+  rpc Read(ReadRequest) returns (stream ReadResponse);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+  rpc Maintenance(MaintenanceRequest) returns (MaintenanceResponse);
+  rpc StorageStatus(StorageStatusRequest) returns (StorageStatusResponse);
+}
+message IdentityRequest {}
+message IdentityResponse {
+  string member = 1;
+  string incarnation = 2;
+  string failure_domain = 3;
+  int64 owner_epoch = 4;
+  string release = 5;
+}
+// Target references identify existing database authority; they never grant it.
+message Target {
+  string attempt = 1;
+  string receipt = 2;
+  string organization = 3;
+  string incarnation = 4;
+  int64 owner_epoch = 5;
+  int64 epoch = 6;
+  int64 profile = 7;
+}
+// Completion verifies the entire byte stream and must be followed by EOF.
+message Completion { int64 size = 1; bytes sha256 = 2; }
+// CompressedChunk uses raw DEFLATE (RFC 1951), independently per chunk.
+// size is the exact uncompressed length, between 1 and 65536 bytes.
+message CompressedChunk { uint32 size = 1; bytes data = 2; }
+message WriteRequest {
+  oneof frame {
+    Target target = 1;
+    bytes data = 2;
+    Completion completion = 3;
+    CompressedChunk compressed_data = 4;
+  }
+}
+// Returned only after the member's existing durable copy publication succeeds.
+message WriteResponse {}
+message ReadRequest {
+  Target target = 1;
+  string operation = 2;
+  string parent_pin = 3;
+  int64 offset = 4;
+  int64 length = 5;
+}
+// Completion follows durable read-handle closure, even for an empty range.
+message ReadResponse {
+  oneof frame { bytes data = 1; Completion completion = 2; CompressedChunk compressed_data = 3; }
+}
+message CancelRequest { Target target = 1; }
+message CancelResponse {}
+enum MaintenanceKind {
+  MAINTENANCE_KIND_UNSPECIFIED = 0;
+  MAINTENANCE_KIND_REWRITE = 1;
+  MAINTENANCE_KIND_ROTATE = 2;
+  MAINTENANCE_KIND_SEALED_RECLAIM = 3;
+  MAINTENANCE_KIND_AUTO_ROTATE = 4;
+}
+message MaintenanceRequest {
+  Target target = 1;
+  string operation = 2;
+  MaintenanceKind kind = 3;
+  bool status_only = 4;
+}
+message MaintenanceResponse {
+  string state = 1;
+  IdentityResponse identity = 2;
+}
+message StorageStatusRequest {}
+message StorageStatusResponse {
+  string status = 1;
+  string checked_at = 2;
+  optional string sampled_at = 3;
+  string member = 4;
+  string failure_domain = 5;
+  optional string owner_epoch = 6;
+  optional string current_file = 7;
+  optional bool closed = 8;
+  optional bool frozen = 9;
+  optional bool closure_uncertain = 10;
+}

@@ -1,0 +1,47 @@
+--- a/conn.go
++++ b/conn.go
+@@ -1075,7 +1075,11 @@
+ 	c.lineLimitReader.LineLimit = 0
+ 
+ 	chunk := io.LimitReader(c.text.R, int64(size))
+-	_, err = io.Copy(c.bdatPipe, chunk)
++	copied, copyErr := io.Copy(c.bdatPipe, chunk)
++	err = copyErr
++	if err == nil && copied != int64(size) {
++		err = io.ErrUnexpectedEOF
++	}
+ 	if err != nil {
+ 		// Backend might return an error early using CloseWithError without consuming
+ 		// the whole chunk.
+--- a/data.go
++++ b/data.go
+@@ -69,15 +69,6 @@
+ }
+ 
+ func (r *dataReader) Read(b []byte) (n int, err error) {
+-	if r.limited {
+-		if r.n <= 0 {
+-			return 0, ErrDataTooLarge
+-		}
+-		if int64(len(b)) > r.n {
+-			b = b[0:r.n]
+-		}
+-	}
+-
+ 	// Code below is taken from net/textproto with only one modification to
+ 	// not rewrite CRLF -> LF.
+ 
+@@ -134,6 +125,13 @@
+ 				r.state = stateCR
+ 			}
+ 		}
++		// Decode framing before enforcing the payload budget, so a terminator
++		// after exactly the allowed bytes remains a clean EOF. Never emit the
++		// first over-limit payload byte. Draining may resume from the parser state.
++		if r.limited && int64(n) >= r.n {
++			err = ErrDataTooLarge
++			break
++		}
+ 		b[n] = c
+ 		n++
+ 	}

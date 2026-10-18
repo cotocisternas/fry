@@ -1,0 +1,7 @@
+# Track delivery independently for each receiving application
+
+When optional application routing is enabled, FRY will create one logical delivery per distinct application selected by all matching sender, recipient, header, and attachment-type routing rules, using a required per-inbox fallback application when no rule matches. Webhooks carry small notifications with IDs for authenticated email download; delivery completes only on a separate acknowledgment after the application downloads and safely stores the email, with timed-out attempts reusing the delivery ID for consumer deduplication. The independent-application delivery model gives IMAP applications independent mailbox views so reads, moves, and deletions do not affect another application, and delivery completes on safe availability in that view; business-processing outcomes remain the application's responsibility, and retry limits/scheduling remain open.
+
+Conventional email operation must work without application routing or a configured fallback application. Conventional shared mailbox state is the default, so clients using the same mailbox share flags, moves, and deletions. Independent per-application views are opt-in; the independent-view behavior above applies when that feature is enabled. See [optional features](0013-optional-filtering-and-routing.md).
+
+Milestone scope: these optional capabilities are deferred until after the first production milestone proves conventional email operation. See [milestone sequencing](0014-prove-conventional-email-first.md).

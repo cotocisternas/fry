@@ -1,0 +1,163 @@
+{
+  "checked": "2026-10-17",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "rates": {
+    "hours": 730,
+    "traffic_days": 30,
+    "s3_tiers": [
+      [
+        51200,
+        0.0405
+      ],
+      [
+        512000,
+        0.039
+      ],
+      [
+        null,
+        0.037
+      ]
+    ],
+    "egress_tiers": [
+      [
+        10240,
+        0.15
+      ],
+      [
+        51200,
+        0.138
+      ],
+      [
+        153600,
+        0.126
+      ],
+      [
+        null,
+        0.114
+      ]
+    ],
+    "put": 7e-06,
+    "get": 5.6e-07,
+    "node_hour": 0.6426,
+    "nodes": 6,
+    "node_disk_gib": 100,
+    "ebs_gib_month": 0.152,
+    "eks_hour": 0.1,
+    "rds_multi_az_hour": 3.04167,
+    "rds_gib": 3072,
+    "rds_gib_month": 0.438,
+    "nlb_hour": 0.034,
+    "nlb_gb": 0.00825,
+    "nat_gateways": 3,
+    "nat_hour": 0.093,
+    "ipv4_count": 6,
+    "ipv4_hour": 0.005
+  },
+  "scenarios": [
+    {
+      "million_day": 20,
+      "mean_kb": 100,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 60.0,
+      "stored_tib": 54.569682106375694,
+      "external_decimal_tb": 30.0,
+      "components": {
+        "S3 stored messages": 2256.0948246002195,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 4249.08,
+        "NLB hour + byte dimension": 1014.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 18826.30792460022
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 75.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 10174.68,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 29505.850161500548
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 500,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 300.0,
+      "stored_tib": 272.84841053187847,
+      "external_decimal_tb": 150.0,
+      "components": {
+        "S3 stored messages": 10973.2741230011,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 19624.68,
+        "NLB hour + byte dimension": 4974.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 46879.0872230011
+    }
+  ],
+  "egress_sensitivity": [
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 0,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 0.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 0.0,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 19331.170161500548
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 50,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 75.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 10174.68,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 29505.850161500548
+    },
+    {
+      "million_day": 20,
+      "mean_kb": 250,
+      "storage_days": 30,
+      "external_percent": 100,
+      "stored_decimal_tb": 150.0,
+      "stored_tib": 136.42420526593924,
+      "external_decimal_tb": 150.0,
+      "components": {
+        "S3 stored messages": 5525.037061500549,
+        "S3 PUT + one GET per message": 4536.0,
+        "Internet downloads": 19624.68,
+        "NLB hour + byte dimension": 2499.82,
+        "Illustrative compute + database + fixed network": 6770.3131
+      },
+      "subtotal_usd": 38955.85016150055
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+--- a/imapserver/fetch.go
++++ b/imapserver/fetch.go
+@@ -396,6 +396,19 @@
+ 	return w.enc.Literal(size)
+ }
+ 
++// WriteBodySectionNil reports a nonexistent section. A zero-length literal
++// instead denotes an existing section with no bytes (or an empty partial).
++func (w *FetchResponseWriter) WriteBodySectionNil(section *imap.FetchItemBodySection) {
++	w.writeItemSep()
++	enc := w.enc.Encoder
++	if obs, ok := w.options.obsolete[section]; ok {
++		enc.Atom(obs)
++	} else {
++		writeItemBodySection(enc, section)
++	}
++	enc.SP().NIL()
++}
++
+ func writeItemBodySection(enc *imapwire.Encoder, section *imap.FetchItemBodySection) {
+ 	enc.Atom("BODY")
+ 	enc.Special('[')

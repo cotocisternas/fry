@@ -1,0 +1,5 @@
+# Reserve hot-file capacity before dispatch
+
+For explicitly bounded members, reserve a record slot and worst-case encoded message bytes in each exact target file within the receipt preparation transaction, before dispatching either replica write. Settle to actual encoded size only with durable locator publication; retain uncertain or aborted occupancy until closed-write inventory reconciliation proves what remains. This adds contention on per-file metadata but prevents concurrent preparations from promising the same capacity, and avoids treating a lost reply as proof that no bytes were written.
+
+Reserve the full file ceiling for current and building files plus explicit staging headroom, transferring durable rewrite-job reservations into the file catalog and releasing retiring occupancy only after durable unlink. Freeze the bounded member profile across reopening; retain uncapped legacy behavior when both limits are zero. The [implementation design](../design/bounded-hot-admission.md) starts with one capped writable file and existing whole-member reclamation; automatic rotation and sealed-file reads remain later work.

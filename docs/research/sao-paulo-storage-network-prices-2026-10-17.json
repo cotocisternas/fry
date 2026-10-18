@@ -1,0 +1,402 @@
+{
+  "retrieved_date": "2026-10-17",
+  "region": "sa-east-1",
+  "currency": "USD",
+  "catalogs": [
+    {
+      "service": "AmazonS3",
+      "source_url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonS3/current/sa-east-1/index.json",
+      "version": "20261015173540",
+      "publicationDate": "2026-10-15T17:35:40Z",
+      "products": [
+        {
+          "sku": "ZNX83R5ZU4NXKACG",
+          "product": {
+            "sku": "ZNX83R5ZU4NXKACG",
+            "productFamily": "Storage",
+            "attributes": {
+              "servicecode": "AmazonS3",
+              "location": "South America (Sao Paulo)",
+              "locationType": "AWS Region",
+              "availability": "99.99%",
+              "storageClass": "General Purpose",
+              "volumeType": "Standard",
+              "usagetype": "SAE1-TimedStorage-ByteHrs",
+              "operation": "",
+              "durability": "99.999999999%",
+              "regionCode": "sa-east-1",
+              "servicename": "Amazon Simple Storage Service"
+            }
+          },
+          "OnDemand": {
+            "ZNX83R5ZU4NXKACG.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "ZNX83R5ZU4NXKACG",
+              "effectiveDate": "2026-10-01T00:00:00Z",
+              "priceDimensions": {
+                "ZNX83R5ZU4NXKACG.JRTCKXETXF.PGHJ3S3EYE": {
+                  "rateCode": "ZNX83R5ZU4NXKACG.JRTCKXETXF.PGHJ3S3EYE",
+                  "description": "$0.0405 per GB - first 50 TB / month of storage used",
+                  "beginRange": "0",
+                  "endRange": "51200",
+                  "unit": "GB-Mo",
+                  "pricePerUnit": {
+                    "USD": "0.0405000000"
+                  },
+                  "appliesTo": []
+                },
+                "ZNX83R5ZU4NXKACG.JRTCKXETXF.D42MF2PVJS": {
+                  "rateCode": "ZNX83R5ZU4NXKACG.JRTCKXETXF.D42MF2PVJS",
+                  "description": "$0.039 per GB - next 450 TB / month of storage used",
+                  "beginRange": "51200",
+                  "endRange": "512000",
+                  "unit": "GB-Mo",
+                  "pricePerUnit": {
+                    "USD": "0.0390000000"
+                  },
+                  "appliesTo": []
+                },
+                "ZNX83R5ZU4NXKACG.JRTCKXETXF.PXJDJ3YRG3": {
+                  "rateCode": "ZNX83R5ZU4NXKACG.JRTCKXETXF.PXJDJ3YRG3",
+                  "description": "$0.037 per GB - storage used / month over 500 TB",
+                  "beginRange": "512000",
+                  "endRange": "Inf",
+                  "unit": "GB-Mo",
+                  "pricePerUnit": {
+                    "USD": "0.0370000000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        },
+        {
+          "sku": "BRDE588JVSNAD298",
+          "product": {
+            "sku": "BRDE588JVSNAD298",
+            "productFamily": "API Request",
+            "attributes": {
+              "servicecode": "AmazonS3",
+              "location": "South America (Sao Paulo)",
+              "locationType": "AWS Region",
+              "group": "S3-API-Tier2",
+              "groupDescription": "GET and all other requests",
+              "usagetype": "SAE1-Requests-Tier2",
+              "operation": "",
+              "regionCode": "sa-east-1",
+              "servicename": "Amazon Simple Storage Service"
+            }
+          },
+          "OnDemand": {
+            "BRDE588JVSNAD298.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "BRDE588JVSNAD298",
+              "effectiveDate": "2026-10-01T00:00:00Z",
+              "priceDimensions": {
+                "BRDE588JVSNAD298.JRTCKXETXF.6YS6EN2CT7": {
+                  "rateCode": "BRDE588JVSNAD298.JRTCKXETXF.6YS6EN2CT7",
+                  "description": "$0.0056 per 10,000 GET and all other requests",
+                  "beginRange": "0",
+                  "endRange": "Inf",
+                  "unit": "Requests",
+                  "pricePerUnit": {
+                    "USD": "0.0000005600"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        },
+        {
+          "sku": "EFD42GHQBGKAPBHU",
+          "product": {
+            "sku": "EFD42GHQBGKAPBHU",
+            "productFamily": "API Request",
+            "attributes": {
+              "servicecode": "AmazonS3",
+              "location": "South America (Sao Paulo)",
+              "locationType": "AWS Region",
+              "group": "S3-API-Tier1",
+              "groupDescription": "PUT/COPY/POST or LIST requests",
+              "usagetype": "SAE1-Requests-Tier1",
+              "operation": "",
+              "regionCode": "sa-east-1",
+              "servicename": "Amazon Simple Storage Service"
+            }
+          },
+          "OnDemand": {
+            "EFD42GHQBGKAPBHU.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "EFD42GHQBGKAPBHU",
+              "effectiveDate": "2026-10-01T00:00:00Z",
+              "priceDimensions": {
+                "EFD42GHQBGKAPBHU.JRTCKXETXF.6YS6EN2CT7": {
+                  "rateCode": "EFD42GHQBGKAPBHU.JRTCKXETXF.6YS6EN2CT7",
+                  "description": "$0.007 per 1,000 PUT, COPY, POST, or LIST requests",
+                  "beginRange": "0",
+                  "endRange": "Inf",
+                  "unit": "Requests",
+                  "pricePerUnit": {
+                    "USD": "0.0000070000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        },
+        {
+          "sku": "RU257KQYZFGGVBN5",
+          "product": {
+            "sku": "RU257KQYZFGGVBN5",
+            "productFamily": "Data Transfer",
+            "attributes": {
+              "servicecode": "AmazonS3",
+              "transferType": "AWS Outbound",
+              "fromLocation": "South America (Sao Paulo)",
+              "fromLocationType": "AWS Region",
+              "toLocation": "External",
+              "toLocationType": "Other",
+              "usagetype": "SAE1-DataTransfer-Out-Bytes",
+              "operation": "",
+              "fromRegionCode": "sa-east-1",
+              "servicename": "Amazon Simple Storage Service",
+              "toRegionCode": ""
+            }
+          },
+          "OnDemand": {
+            "RU257KQYZFGGVBN5.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "RU257KQYZFGGVBN5",
+              "effectiveDate": "2026-10-01T00:00:00Z",
+              "priceDimensions": {
+                "RU257KQYZFGGVBN5.JRTCKXETXF.6YS6EN2CT7": {
+                  "rateCode": "RU257KQYZFGGVBN5.JRTCKXETXF.6YS6EN2CT7",
+                  "description": "$0.0 per GB for S3-DT-AWS Outbound",
+                  "beginRange": "0",
+                  "endRange": "Inf",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.0000000000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "service": "AWSDataTransfer",
+      "source_url": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/sa-east-1/index.json",
+      "version": "20260916132208",
+      "publicationDate": "2026-09-16T13:22:08Z",
+      "products": [
+        {
+          "sku": "YR2FH85AY9B4PG8R",
+          "product": {
+            "sku": "YR2FH85AY9B4PG8R",
+            "productFamily": "Data Transfer",
+            "attributes": {
+              "servicecode": "AWSDataTransfer",
+              "transferType": "IntraRegion",
+              "fromLocation": "South America (Sao Paulo)",
+              "fromLocationType": "AWS Region",
+              "toLocation": "South America (Sao Paulo)",
+              "toLocationType": "AWS Region",
+              "usagetype": "SAE1-DataTransfer-Regional-Bytes",
+              "operation": "",
+              "fromRegionCode": "sa-east-1",
+              "servicename": "AWS Data Transfer",
+              "toRegionCode": "sa-east-1"
+            }
+          },
+          "OnDemand": {
+            "YR2FH85AY9B4PG8R.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "YR2FH85AY9B4PG8R",
+              "effectiveDate": "2026-06-01T00:00:00Z",
+              "priceDimensions": {
+                "YR2FH85AY9B4PG8R.JRTCKXETXF.6YS6EN2CT7": {
+                  "rateCode": "YR2FH85AY9B4PG8R.JRTCKXETXF.6YS6EN2CT7",
+                  "description": "$0.010 per GB - regional data transfer - in/out/between EC2 AZs or using elastic IPs or ELB",
+                  "beginRange": "0",
+                  "endRange": "Inf",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.0100000000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        },
+        {
+          "sku": "QKTPK3975YUWDU3Q",
+          "product": {
+            "sku": "QKTPK3975YUWDU3Q",
+            "productFamily": "Data Transfer",
+            "attributes": {
+              "servicecode": "AWSDataTransfer",
+              "transferType": "AWS Outbound",
+              "fromLocation": "South America (Sao Paulo)",
+              "fromLocationType": "AWS Region",
+              "toLocation": "External",
+              "toLocationType": "Other",
+              "usagetype": "SAE1-DataTransfer-Out-Bytes",
+              "operation": "",
+              "fromRegionCode": "sa-east-1",
+              "servicename": "AWS Data Transfer",
+              "toRegionCode": ""
+            }
+          },
+          "OnDemand": {
+            "QKTPK3975YUWDU3Q.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "QKTPK3975YUWDU3Q",
+              "effectiveDate": "2026-06-01T00:00:00Z",
+              "priceDimensions": {
+                "QKTPK3975YUWDU3Q.JRTCKXETXF.Q3Z75P77EN": {
+                  "rateCode": "QKTPK3975YUWDU3Q.JRTCKXETXF.Q3Z75P77EN",
+                  "description": "$0.150 per GB - up to 10 TB / month data transfer out",
+                  "beginRange": "0",
+                  "endRange": "10240",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.1500000000"
+                  },
+                  "appliesTo": []
+                },
+                "QKTPK3975YUWDU3Q.JRTCKXETXF.VF6T3GAUKQ": {
+                  "rateCode": "QKTPK3975YUWDU3Q.JRTCKXETXF.VF6T3GAUKQ",
+                  "description": "$0.138 per GB - next 40 TB / month data transfer out",
+                  "beginRange": "10240",
+                  "endRange": "51200",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.1380000000"
+                  },
+                  "appliesTo": []
+                },
+                "QKTPK3975YUWDU3Q.JRTCKXETXF.N9EW5UVVPA": {
+                  "rateCode": "QKTPK3975YUWDU3Q.JRTCKXETXF.N9EW5UVVPA",
+                  "description": "$0.126 per GB - next 100 TB / month data transfer out",
+                  "beginRange": "51200",
+                  "endRange": "153600",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.1260000000"
+                  },
+                  "appliesTo": []
+                },
+                "QKTPK3975YUWDU3Q.JRTCKXETXF.GPHXDESFBB": {
+                  "rateCode": "QKTPK3975YUWDU3Q.JRTCKXETXF.GPHXDESFBB",
+                  "description": "$0.114 per GB - greater than 150 TB / month data transfer out",
+                  "beginRange": "153600",
+                  "endRange": "Inf",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.1140000000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        },
+        {
+          "sku": "WK76NYDV7TRJUEG3",
+          "product": {
+            "sku": "WK76NYDV7TRJUEG3",
+            "productFamily": "Data Transfer",
+            "attributes": {
+              "servicecode": "AWSDataTransfer",
+              "transferType": "IntraRegion-xAZ-Out",
+              "fromLocation": "South America (Sao Paulo)",
+              "fromLocationType": "AWS Region",
+              "toLocation": "South America (Sao Paulo)",
+              "toLocationType": "AWS Region",
+              "usagetype": "SAE1-DataTransfer-xAZ-Out-Bytes",
+              "operation": "",
+              "fromRegionCode": "sa-east-1",
+              "servicename": "AWS Data Transfer",
+              "toRegionCode": "sa-east-1"
+            }
+          },
+          "OnDemand": {
+            "WK76NYDV7TRJUEG3.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "WK76NYDV7TRJUEG3",
+              "effectiveDate": "2026-06-01T00:00:00Z",
+              "priceDimensions": {
+                "WK76NYDV7TRJUEG3.JRTCKXETXF.6YS6EN2CT7": {
+                  "rateCode": "WK76NYDV7TRJUEG3.JRTCKXETXF.6YS6EN2CT7",
+                  "description": "$0.00 per GB - regional data transfer - in/out/between EC2 Azs or using elastic IPs or ELB",
+                  "beginRange": "0",
+                  "endRange": "Inf",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.0000000000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        },
+        {
+          "sku": "W7TABR7XKBJE9ZXC",
+          "product": {
+            "sku": "W7TABR7XKBJE9ZXC",
+            "productFamily": "Data Transfer",
+            "attributes": {
+              "servicecode": "AWSDataTransfer",
+              "transferType": "IntraRegion-xAZ-In",
+              "fromLocation": "South America (Sao Paulo)",
+              "fromLocationType": "AWS Region",
+              "toLocation": "South America (Sao Paulo)",
+              "toLocationType": "AWS Region",
+              "usagetype": "SAE1-DataTransfer-xAZ-In-Bytes",
+              "operation": "",
+              "fromRegionCode": "sa-east-1",
+              "servicename": "AWS Data Transfer",
+              "toRegionCode": "sa-east-1"
+            }
+          },
+          "OnDemand": {
+            "W7TABR7XKBJE9ZXC.JRTCKXETXF": {
+              "offerTermCode": "JRTCKXETXF",
+              "sku": "W7TABR7XKBJE9ZXC",
+              "effectiveDate": "2026-06-01T00:00:00Z",
+              "priceDimensions": {
+                "W7TABR7XKBJE9ZXC.JRTCKXETXF.6YS6EN2CT7": {
+                  "rateCode": "W7TABR7XKBJE9ZXC.JRTCKXETXF.6YS6EN2CT7",
+                  "description": "$0.00 per GB - regional data transfer - in/out/between EC2 Azs or using elastic IPs or ELB",
+                  "beginRange": "0",
+                  "endRange": "Inf",
+                  "unit": "GB",
+                  "pricePerUnit": {
+                    "USD": "0.0000000000"
+                  },
+                  "appliesTo": []
+                }
+              },
+              "termAttributes": {}
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

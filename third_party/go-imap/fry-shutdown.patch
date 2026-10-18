@@ -1,0 +1,33 @@
+--- a/imapserver/server.go
++++ b/imapserver/server.go
+@@ -111,6 +111,9 @@
+ 	s.mutex.Lock()
+ 	ok := !s.closed
+ 	if ok {
++		// Register lifetime under the same lock as Close's closed transition.
++		// No positive Add may race a Wait that observed zero listeners.
++		s.listenerWaitGroup.Add(1)
+ 		s.listeners[ln] = struct{}{}
+ 	}
+ 	s.mutex.Unlock()
+@@ -124,7 +127,6 @@
+ 		s.mutex.Unlock()
+ 	}()
+ 
+-	s.listenerWaitGroup.Add(1)
+ 	defer s.listenerWaitGroup.Done()
+ 
+ 	var delay time.Duration
+--- a/imapserver/conn.go
++++ b/imapserver/conn.go
+@@ -102,6 +102,10 @@
+ 	}()
+ 
+ 	c.server.mutex.Lock()
++	if c.server.closed {
++		c.server.mutex.Unlock()
++		return
++	}
+ 	c.server.conns[c] = struct{}{}
+ 	c.server.mutex.Unlock()
+ 	defer func() {

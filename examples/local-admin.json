@@ -1,0 +1,80 @@
+{
+  "domain": "fry.local",
+  "listen": "127.0.0.1:2525",
+  "data_directory": "./.fry-local",
+  "max_message_bytes": 1048576,
+  "member_capacity_bytes": 1073741824,
+  "recovery_retention_hours": 168,
+  "max_connections": 32,
+  "max_in_flight": 8,
+  "members": [
+    {
+      "id": "10000000000000000000000000000001",
+      "domain": "local-a"
+    },
+    {
+      "id": "10000000000000000000000000000002",
+      "domain": "local-b"
+    }
+  ],
+  "routes": [
+    {
+      "address": "invoices@example.test",
+      "organization": "20000000000000000000000000000001",
+      "inboxes": [
+        "30000000000000000000000000000001"
+      ]
+    },
+    {
+      "address": "billing@example.test",
+      "organization": "20000000000000000000000000000001",
+      "inboxes": [
+        "30000000000000000000000000000001"
+      ]
+    }
+  ],
+  "imap": {
+    "listen": "127.0.0.1:1143",
+    "accounts": [
+      {
+        "username": "invoices",
+        "password_environment": "FRY_LOCAL_IMAP_PASSWORD",
+        "organization": "20000000000000000000000000000001",
+        "inbox": "30000000000000000000000000000001"
+      }
+    ]
+  },
+  "outbound": {
+    "default_relay": "50000000000000000000000000000001",
+    "retry_hours": 1,
+    "notice_retry_hours": 1,
+    "relays": [
+      {
+        "id": "50000000000000000000000000000001",
+        "address": "127.0.0.1:2525",
+        "transport": "loopback"
+      }
+    ],
+    "submission": {
+      "listen": "127.0.0.1:2587",
+      "accounts": [
+        {
+          "username": "robot",
+          "password_environment": "FRY_LOCAL_SMTP_PASSWORD",
+          "organization": "20000000000000000000000000000001",
+          "authorized_senders": [
+            "robot@example.test"
+          ]
+        }
+      ]
+    }
+  },
+  "admin": {
+    "listen": "127.0.0.1:8080",
+    "origin": "http://127.0.0.1:8080",
+    "session_minutes": 60,
+    "bootstrap_username": "operator",
+    "bootstrap_password_environment": "FRY_LOCAL_ADMIN_PASSWORD",
+    "bootstrap_content_access": true
+  }
+}

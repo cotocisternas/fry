@@ -1,0 +1,99 @@
+{
+  "domain": "mail.example.test",
+  "listen": "0.0.0.0:25",
+  "data_directory": "/var/lib/fry",
+  "max_message_bytes": 1048576,
+  "member_capacity_bytes": 1073741824,
+  "recovery_retention_hours": 168,
+  "max_connections": 32,
+  "max_in_flight": 8,
+  "members": [
+    {
+      "id": "10000000000000000000000000000001",
+      "domain": "local-a"
+    },
+    {
+      "id": "10000000000000000000000000000002",
+      "domain": "local-b"
+    }
+  ],
+  "routes": [
+    {
+      "address": "invoices@example.test",
+      "organization": "20000000000000000000000000000001",
+      "inboxes": [
+        "30000000000000000000000000000001"
+      ]
+    },
+    {
+      "address": "billing@example.test",
+      "organization": "20000000000000000000000000000001",
+      "inboxes": [
+        "30000000000000000000000000000001"
+      ]
+    }
+  ],
+  "imap": {
+    "listen": "0.0.0.0:993",
+    "accounts": [
+      {
+        "username": "invoices",
+        "password_environment": "FRY_IMAP_PASSWORD",
+        "organization": "20000000000000000000000000000001",
+        "inbox": "30000000000000000000000000000001"
+      }
+    ],
+    "transport": "tls",
+    "tls_cert_file": "/etc/fry/tls/mail-fullchain.pem",
+    "tls_key_file": "/etc/fry/tls/mail-key.pem",
+    "handshake_timeout_seconds": 10
+  },
+  "outbound": {
+    "default_relay": "50000000000000000000000000000001",
+    "retry_hours": 1,
+    "notice_retry_hours": 1,
+    "relays": [
+      {
+        "id": "50000000000000000000000000000001",
+        "address": "relay.example.test:587",
+        "transport": "starttls",
+        "username": "fry-relay",
+        "password_environment": "FRY_RELAY_PASSWORD"
+      }
+    ],
+    "submission": {
+      "listen": "0.0.0.0:587",
+      "accounts": [
+        {
+          "username": "robot",
+          "password_environment": "FRY_SUBMISSION_PASSWORD",
+          "organization": "20000000000000000000000000000001",
+          "authorized_senders": [
+            "robot@example.test"
+          ]
+        }
+      ],
+      "transport": "starttls-required",
+      "tls_cert_file": "/etc/fry/tls/mail-fullchain.pem",
+      "tls_key_file": "/etc/fry/tls/mail-key.pem",
+      "handshake_timeout_seconds": 10
+    }
+  },
+  "admin": {
+    "listen": "0.0.0.0:8443",
+    "origin": "https://admin.example.test:8443",
+    "session_minutes": 60,
+    "bootstrap_username": "operator",
+    "bootstrap_password_environment": "FRY_ADMIN_PASSWORD",
+    "bootstrap_content_access": false,
+    "transport": "tls",
+    "tls_cert_file": "/etc/fry/tls/admin-fullchain.pem",
+    "tls_key_file": "/etc/fry/tls/admin-key.pem",
+    "handshake_timeout_seconds": 10,
+    "max_connections": 64
+  },
+  "transport": "starttls",
+  "tls_cert_file": "/etc/fry/tls/mail-fullchain.pem",
+  "tls_key_file": "/etc/fry/tls/mail-key.pem",
+  "handshake_timeout_seconds": 10
+}

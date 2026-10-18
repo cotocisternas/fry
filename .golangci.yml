@@ -1,0 +1,151 @@
+version: "2"
+
+run:
+  relative-path-mode: gomod
+  timeout: 10m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - errorlint
+    - contextcheck
+    - noctx
+    - bodyclose
+    - sqlclosecheck
+    - rowserrcheck
+    - spancheck
+    - gosec
+    - nolintlint
+    - cyclop
+    - gocognit
+    - funlen
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - exhaustive
+    - unparam
+    - fatcontext
+    - sloglint
+    - depguard
+    - revive
+    - lll
+    - intrange
+    - copyloopvar
+    - unconvert
+    - asasalint
+    - bidichk
+    - durationcheck
+    - gocheckcompilerdirectives
+    - dupl
+    - gocritic
+    - makezero
+    - nosprintfhostport
+    - thelper
+    - errname
+    - predeclared
+  settings:
+    dupl:
+      threshold: 100
+    gocritic:
+      disable-all: true
+      enabled-checks:
+        - appendAssign
+        - badCall
+        - badCond
+        - caseOrder
+        - dupArg
+        - dupBranchBody
+        - dupCase
+        - dupSubExpr
+        - exitAfterDefer
+        - offBy1
+    makezero:
+      always: false
+    thelper:
+      test:
+        begin: true
+        name: false
+        first: false
+      benchmark:
+        begin: true
+        name: false
+        first: false
+      tb:
+        begin: true
+        name: false
+        first: false
+      fuzz:
+        begin: true
+        name: false
+        first: false
+    revive:
+      enable-default-rules: false
+      rules:
+        - name: receiver-naming
+    lll:
+      line-length: 120
+      tab-width: 4
+    cyclop:
+      max-complexity: 10
+      package-average: 0.0
+    gocognit:
+      min-complexity: 15
+    funlen:
+      lines: 60
+      statements: 40
+    exhaustive:
+      check: [switch, mapliteral]
+      default-signifies-exhaustive: false
+    sloglint:
+      context: scope
+    depguard:
+      rules:
+        transport-persistence:
+          files:
+            - '**/internal/admintransport/*.go'
+            - '**/cmd/fry-admin/*.go'
+          deny:
+            - pkg: github.com/cotocisternas/fry/internal/admin/dbgen
+              desc: Call administration operations; generated queries are private to persistence.
+            - pkg: github.com/cotocisternas/fry/internal/maildirectory/dbgen
+              desc: Call directory operations; generated queries are private to persistence.
+            - pkg: github.com/cotocisternas/fry/internal/receiptstore/dbgen
+              desc: Call receipt operations; generated queries are private to persistence.
+    errcheck:
+      check-blank: true
+      check-type-assertions: true
+      disable-default-exclusions: true
+    spancheck:
+      checks: [end]
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    generated: strict
+    presets: []
+    warn-unused: true
+
+formatters:
+  enable: [gofumpt, goimports, golines]
+  settings:
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: false
+    gofumpt:
+      extra-rules: false
+  exclusions:
+    generated: strict
+    warn-unused: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false

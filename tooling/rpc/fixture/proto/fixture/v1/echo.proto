@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package fixture.v1;
+
+option go_package = "github.com/cotocisternas/fry/tooling/rpc/fixture/gen/fixture/v1;fixturev1";
+
+// EchoService exists only to compile the local toolchain's generated bindings.
+service EchoService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+}
+message EchoRequest { string text = 1; }
+message EchoResponse { string text = 1; }
+message WatchRequest { string text = 1; }
+message WatchResponse { string text = 1; }
+message UploadRequest { bytes chunk = 1; }
+message UploadResponse { uint64 bytes = 1; }

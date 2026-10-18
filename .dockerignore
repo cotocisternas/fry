@@ -1,0 +1,22 @@
+# An allowlist keeps fixtures, credentials, private data, and agent state out.
+**
+!Dockerfile
+!.dockerignore
+!go.mod
+!go.sum
+!LICENSE
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!db/
+!db/**
+!gen/
+!gen/**
+!third_party/
+!third_party/**
+
+# Runtime builds do not need test sources or generated fixtures.
+**/*_test.go
+**/testdata/**
+internal/testutil/**

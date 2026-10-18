@@ -1,0 +1,3 @@
+# Leave business document validation to receiving applications
+
+Optional filtering, including spam and malware checks, starts disabled for new inboxes and is enabled by administrators as needed. When enabled, FRY checks email/security and attachment formats; receiving applications validate document schemas and business content, such as whether an invoice names the correct buyer. FRY can receive, preserve, and deliver arbitrary attachment types without enabling these checks or requiring document classification. Supported inspection formats and exact checks remain to be defined; business validation stays outside the gateway. See [optional filtering and routing](0013-optional-filtering-and-routing.md).

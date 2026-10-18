@@ -1,0 +1,28 @@
+# Local build, audit, test, and toolchain output.
+/.artifacts/
+/.fry-*/
+/bin/
+/dist/
+**/node_modules/
+**/__pycache__/
+*.py[cod]
+*.test
+coverage.out
+
+# Local credentials and configuration; keep documented examples tracked.
+.env
+.env.*
+!.env.example
+mise.local.toml
+mise.*.local.toml
+
+# Personal editor and operating-system state.
+/.idea/
+/.vscode/
+.DS_Store
+*~
+*.swp
+*.swo
+
+# Agent-specific personal settings; shared skills remain versioned.
+/.claude/settings.local.json

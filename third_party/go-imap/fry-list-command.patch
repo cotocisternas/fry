@@ -1,0 +1,13 @@
+--- a/imapserver/list.go
++++ b/imapserver/list.go
+@@ -255,6 +255,10 @@
+ }
+ 
+ // WriteList writes a single LIST response for a mailbox.
++// IsLSUB reports the legacy command so backends can implement its distinct
++// subscribed-parent wildcard semantics without changing LIST (SUBSCRIBED).
++func (w *ListWriter) IsLSUB() bool { return w.lsub }
++
+ func (w *ListWriter) WriteList(data *imap.ListData) error {
+ 	if w.lsub {
+ 		return w.conn.writeLSub(data)

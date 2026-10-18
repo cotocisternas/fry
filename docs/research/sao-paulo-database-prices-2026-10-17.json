@@ -1,0 +1,231 @@
+{
+  "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/sa-east-1/index.json",
+  "retrievedDate": "2026-10-17",
+  "publicationDate": "2026-10-06T22:40:50Z",
+  "version": "20261006224050",
+  "products": {
+    "D6JZWQD944PRDFSS": {
+      "sku": "D6JZWQD944PRDFSS",
+      "productFamily": "Database Instance",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "South America (Sao Paulo)",
+        "locationType": "AWS Region",
+        "instanceType": "db.r7g.2xlarge",
+        "currentGeneration": "Yes",
+        "instanceFamily": "Memory optimized",
+        "vcpu": "8",
+        "physicalProcessor": "AWS Graviton3",
+        "memory": "64 GiB",
+        "storage": "EBS Only",
+        "networkPerformance": "Up to 15 Gigabit",
+        "processorArchitecture": "64-bit",
+        "engineCode": "14",
+        "databaseEngine": "PostgreSQL",
+        "licenseModel": "No license required",
+        "deploymentOption": "Single-AZ",
+        "usagetype": "SAE1-InstanceUsage:db.r7g.2xl",
+        "operation": "CreateDBInstance:0014",
+        "instanceTypeFamily": "R7G",
+        "normalizationSizeFactor": "16",
+        "regionCode": "sa-east-1",
+        "servicename": "Amazon Relational Database Service",
+        "unbundledLicensing": "FALSE"
+      }
+    },
+    "XHJC6R7HWJVU5K6J": {
+      "sku": "XHJC6R7HWJVU5K6J",
+      "productFamily": "Database Instance",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "South America (Sao Paulo)",
+        "locationType": "AWS Region",
+        "instanceType": "db.r7g.2xlarge",
+        "currentGeneration": "Yes",
+        "instanceFamily": "Memory optimized",
+        "vcpu": "8",
+        "physicalProcessor": "AWS Graviton3",
+        "memory": "64 GiB",
+        "storage": "EBS Only",
+        "networkPerformance": "Up to 15 Gigabit",
+        "processorArchitecture": "64-bit",
+        "engineCode": "14",
+        "databaseEngine": "PostgreSQL",
+        "licenseModel": "No license required",
+        "deploymentOption": "Multi-AZ",
+        "usagetype": "SAE1-Multi-AZUsage:db.r7g.2xl",
+        "operation": "CreateDBInstance:0014",
+        "instanceTypeFamily": "R7G",
+        "normalizationSizeFactor": "32",
+        "regionCode": "sa-east-1",
+        "servicename": "Amazon Relational Database Service",
+        "unbundledLicensing": "FALSE"
+      }
+    },
+    "76QZ3RFK75ZTYQZE": {
+      "sku": "76QZ3RFK75ZTYQZE",
+      "productFamily": "Database Storage",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "South America (Sao Paulo)",
+        "locationType": "AWS Region",
+        "storageMedia": "SSD",
+        "volumeType": "General Purpose-GP3",
+        "minVolumeSize": "5 GB",
+        "maxVolumeSize": "16 TB",
+        "engineCode": "14",
+        "databaseEngine": "PostgreSQL",
+        "deploymentOption": "Multi-AZ",
+        "usagetype": "SAE1-RDS:Multi-AZ-GP3-Storage",
+        "operation": "CreateDBInstance:0014",
+        "regionCode": "sa-east-1",
+        "servicename": "Amazon Relational Database Service"
+      }
+    },
+    "BF7BP93TH85E5MY8": {
+      "sku": "BF7BP93TH85E5MY8",
+      "productFamily": "Provisioned IOPS",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "South America (Sao Paulo)",
+        "locationType": "AWS Region",
+        "engineCode": "14",
+        "databaseEngine": "PostgreSQL",
+        "deploymentOption": "Multi-AZ",
+        "group": "RDS-PIOPS",
+        "groupDescription": "RDS Provisioned GP3 IOPS",
+        "usagetype": "SAE1-RDS:Multi-AZ-GP3-PIOPS",
+        "operation": "CreateDBInstance:0014",
+        "regionCode": "sa-east-1",
+        "servicename": "Amazon Relational Database Service"
+      }
+    },
+    "SCVCNBZY5D8BM77C": {
+      "sku": "SCVCNBZY5D8BM77C",
+      "productFamily": "Provisioned Throughput",
+      "attributes": {
+        "servicecode": "AmazonRDS",
+        "location": "South America (Sao Paulo)",
+        "locationType": "AWS Region",
+        "engineCode": "14",
+        "databaseEngine": "PostgreSQL",
+        "deploymentOption": "Multi-AZ",
+        "group": "RDS-Throughput",
+        "groupDescription": "RDS Provisioned Throughput",
+        "usagetype": "SAE1-RDS:Multi-AZ-GP3-Throughput",
+        "operation": "CreateDBInstance:0014",
+        "regionCode": "sa-east-1",
+        "servicename": "Amazon Relational Database Service"
+      }
+    }
+  },
+  "terms": {
+    "OnDemand": {
+      "D6JZWQD944PRDFSS": {
+        "D6JZWQD944PRDFSS.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "D6JZWQD944PRDFSS",
+          "effectiveDate": "2026-10-01T00:00:00Z",
+          "priceDimensions": {
+            "D6JZWQD944PRDFSS.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "D6JZWQD944PRDFSS.JRTCKXETXF.6YS6EN2CT7",
+              "description": "USD 1.52004 per RDS db.r7g.2xlarge Single-AZ instance hour (or partial hour) running PostgreSQL",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "1.5200400000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "XHJC6R7HWJVU5K6J": {
+        "XHJC6R7HWJVU5K6J.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "XHJC6R7HWJVU5K6J",
+          "effectiveDate": "2026-10-01T00:00:00Z",
+          "priceDimensions": {
+            "XHJC6R7HWJVU5K6J.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "XHJC6R7HWJVU5K6J.JRTCKXETXF.6YS6EN2CT7",
+              "description": "USD 3.04167 per RDS db.r7g.2xlarge Multi-AZ instance hour (or partial hour) running PostgreSQL",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "Hrs",
+              "pricePerUnit": {
+                "USD": "3.0416700000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "76QZ3RFK75ZTYQZE": {
+        "76QZ3RFK75ZTYQZE.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "76QZ3RFK75ZTYQZE",
+          "effectiveDate": "2026-10-01T00:00:00Z",
+          "priceDimensions": {
+            "76QZ3RFK75ZTYQZE.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "76QZ3RFK75ZTYQZE.JRTCKXETXF.6YS6EN2CT7",
+              "description": "$0.438 per GB-month of provisioned GP3 storage for Multi-AZ deployments running PostgreSQL",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "GB-Mo",
+              "pricePerUnit": {
+                "USD": "0.4380000000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "BF7BP93TH85E5MY8": {
+        "BF7BP93TH85E5MY8.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "BF7BP93TH85E5MY8",
+          "effectiveDate": "2026-10-01T00:00:00Z",
+          "priceDimensions": {
+            "BF7BP93TH85E5MY8.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "BF7BP93TH85E5MY8.JRTCKXETXF.6YS6EN2CT7",
+              "description": "$0.076 per IOPS-month of provisioned GP3 IOPS for Multi-AZ deployments running PostgreSQL",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "IOPS-Mo",
+              "pricePerUnit": {
+                "USD": "0.0760000000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      },
+      "SCVCNBZY5D8BM77C": {
+        "SCVCNBZY5D8BM77C.JRTCKXETXF": {
+          "offerTermCode": "JRTCKXETXF",
+          "sku": "SCVCNBZY5D8BM77C",
+          "effectiveDate": "2026-10-01T00:00:00Z",
+          "priceDimensions": {
+            "SCVCNBZY5D8BM77C.JRTCKXETXF.6YS6EN2CT7": {
+              "rateCode": "SCVCNBZY5D8BM77C.JRTCKXETXF.6YS6EN2CT7",
+              "description": "$0.305 per  MiBps-month of provisioned GP3 Storage throughput for Multi-AZ deployments running PostgreSQL",
+              "beginRange": "0",
+              "endRange": "Inf",
+              "unit": "MBPS-Mo",
+              "pricePerUnit": {
+                "USD": "0.3050000000"
+              },
+              "appliesTo": []
+            }
+          },
+          "termAttributes": {}
+        }
+      }
+    }
+  }
+}

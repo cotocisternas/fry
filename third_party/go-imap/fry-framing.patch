@@ -1,0 +1,111 @@
+--- a/imapserver/append.go
++++ b/imapserver/append.go
+@@ -89,16 +89,19 @@
+ 		return err
+ 	}
+ 
+-	data, appendErr := c.session.Append(mailbox, lit, &options)
+-	if _, discardErr := io.Copy(io.Discard, lit); discardErr != nil {
+-		return err
+-	}
+-	if dataExt != "" && !dec.ExpectSpecial(')') {
+-		return dec.Err()
+-	}
+-	if !dec.ExpectCRLF() {
+-		return err
+-	}
++	// A backend must not observe the complete literal before its command framing
++	// is valid. In particular, CopyN can discard an error on its final full read.
++	framed := &appendLiteral{literal: lit, decoder: dec, remaining: lit.Size(), extension: dataExt}
++	if framed.remaining == 0 {
++		if err := framed.finish(); err != nil {
++			return err
++		}
++	}
++	data, appendErr := c.session.Append(mailbox, framed, &options)
++	if _, err := io.Copy(io.Discard, framed); err != nil {
++		return err
++	}
++
+ 	if appendErr != nil {
+ 		return appendErr
+ 	}
+@@ -121,3 +124,78 @@
+ 	enc.Text("APPEND completed")
+ 	return enc.CRLF()
+ }
++
++// appendLiteral withholds the final payload chunk until the literal is complete
++// and the command trailer has been decoded. It does not buffer the whole message.
++// Only a fully framed command exposes Size() bytes or a successful EOF.
++type appendLiteral struct {
++	literal   *imapwire.LiteralReader
++	decoder   *imapwire.Decoder
++	remaining int64
++	extension string
++	finished  bool
++	failure   error
++}
++
++func (r *appendLiteral) Size() int64 { return r.literal.Size() }
++func (r *appendLiteral) finish() error {
++	if r.failure != nil {
++		return r.failure
++	}
++	if r.finished {
++		return nil
++	}
++	// Force the decoder's literal reader to observe EOF and release literal mode.
++	var probe [1]byte
++	n, err := r.literal.Read(probe[:])
++	if n != 0 || err != io.EOF {
++		if err == nil {
++			err = io.ErrUnexpectedEOF
++		}
++		r.failure = err
++		return err
++	}
++	if r.extension != "" && !r.decoder.ExpectSpecial(')') {
++		r.failure = r.decoder.Err()
++	}
++	if r.failure == nil && !r.decoder.ExpectCRLF() {
++		r.failure = r.decoder.Err()
++	}
++	if r.failure != nil {
++		return r.failure
++	}
++	r.finished = true
++	return nil
++}
++func (r *appendLiteral) Read(p []byte) (int, error) {
++	if len(p) == 0 {
++		return 0, nil
++	}
++	if r.failure != nil {
++		return 0, r.failure
++	}
++	if r.finished {
++		return 0, io.EOF
++	}
++	if int64(len(p)) > r.remaining {
++		p = p[:r.remaining]
++	}
++	n, err := r.literal.Read(p)
++	r.remaining -= int64(n)
++	if err != nil && (err != io.EOF || r.remaining > 0) {
++		if err == io.EOF {
++			err = io.ErrUnexpectedEOF
++		}
++		r.failure = err
++		if r.remaining == 0 {
++			return 0, err
++		}
++		return n, err
++	}
++	if r.remaining == 0 {
++		if err = r.finish(); err != nil {
++			return 0, err
++		}
++	}
++	return n, nil
++}

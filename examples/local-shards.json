@@ -1,0 +1,65 @@
+{
+  "domain": "fry.local",
+  "listen": "127.0.0.1:2525",
+  "data_directory": "./.fry-local-shards",
+  "max_message_bytes": 1048576,
+  "member_capacity_bytes": 536870912,
+  "recovery_retention_hours": 168,
+  "max_connections": 32,
+  "max_in_flight": 8,
+  "routes": [
+    {
+      "address": "invoices@example.test",
+      "organization": "20000000000000000000000000000001",
+      "inboxes": [
+        "30000000000000000000000000000001"
+      ]
+    },
+    {
+      "address": "billing@example.test",
+      "organization": "20000000000000000000000000000001",
+      "inboxes": [
+        "30000000000000000000000000000001"
+      ]
+    }
+  ],
+  "imap": {
+    "listen": "127.0.0.1:1143",
+    "accounts": [
+      {
+        "username": "invoices",
+        "password_environment": "FRY_LOCAL_IMAP_PASSWORD",
+        "organization": "20000000000000000000000000000001",
+        "inbox": "30000000000000000000000000000001"
+      }
+    ]
+  },
+  "ingest_shards": [
+    {
+      "id": "00000000000000000000000000000065",
+      "members": [
+        {
+          "id": "00000000000000000000000000000001",
+          "domain": "local-a"
+        },
+        {
+          "id": "00000000000000000000000000000002",
+          "domain": "local-b"
+        }
+      ]
+    },
+    {
+      "id": "00000000000000000000000000000066",
+      "members": [
+        {
+          "id": "00000000000000000000000000000003",
+          "domain": "local-a"
+        },
+        {
+          "id": "00000000000000000000000000000004",
+          "domain": "local-b"
+        }
+      ]
+    }
+  ]
+}

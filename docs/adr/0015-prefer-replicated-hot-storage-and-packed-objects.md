@@ -1,0 +1,7 @@
+# Prefer replicated hot storage followed by packed object uploads
+
+FRY's preferred storage direction is durable replicated hot storage for receipt, followed by asynchronous uploads of multiple messages in immutable object-store packs. The user preferred this alternative to making each email wait for its own S3 upload, to investigate lower acceptance latency and amortized request costs; this replaces the earlier S3-first design as the direction to develop, not as a validated production implementation.
+
+The user subsequently clarified that FRY should implement a substantially simpler design inspired by SCRAP's distribution and packing pattern, without using SCRAP itself. SCRAP is reference material, not a dependency or adaptation target. No replica topology, pack format, or performance/cost claim is selected here. Final SMTP acceptance still requires durable bytes and recoverable FRY receipt/destination/work state under the active deployment profile. See [the simpler storage proposal](../design/replicated-hot-storage.md).
+
+Size hot storage initially to absorb six hours of incoming mail at the expected byte rate during object-store upload unavailability, configurable, while local replicas and metadata storage remain healthy. This is a capacity-planning target, not a retention period or elapsed-time cutoff. Exhausting safe capacity triggers temporary SMTP deferral and paused IMAP collection while preserving accepted mail. Byte rates, replica overhead, headroom, and catch-up throughput must be measured and included in the revised design/cost estimate.

@@ -1,0 +1,3 @@
+# Allow processing to lag durable receipt during bursts
+
+FRY may safely retain accepted messages while checks and delivery to IMAP/API/webhook consumers catch up, with a temporary delay of several minutes acceptable during bursts. Processing prioritizes fair service across organizations and may check/deliver messages within an inbox out of arrival order while preserving receipt timestamps, enabling parallel work on concentrated batches. Maximum delay, measurable fairness targets, backlog limits, checks required before acceptance, overload behavior, and persistence/scheduling mechanisms remain open.

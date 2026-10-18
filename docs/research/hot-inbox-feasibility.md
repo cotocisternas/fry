@@ -1,0 +1,28 @@
+# Hot inbox feasibility: Gluon source inspection
+
+Date: 2026-10-17. Inspected Gluon commit `2561acfbad82c2ef0f576a8df98b3269a0cbbfee`. This bounded source review identifies behavior to test; it establishes neither a throughput ceiling nor production fitness.
+
+FRY must handle batches of approximately 500,000 messages, potentially concentrated in one inbox. Arrival duration remains unknown. Each consuming application has independent folders, flags, and deletion state; originals survive view deletion until retention expires. Required business searches cover headers, dates, and flags. The user accepts processing and delivery out of arrival order, with receipt timestamps preserved. This permits parallel processing without requiring arrival-ordered publication; IMAP UID/session correctness still applies.
+
+## Verified source behavior
+
+**Connector updates serialize per Gluon user.** The user starts one goroutine that reads its update channel and calls `user.apply` before taking the next update. State notifications iterate over that user's active states. Startup also lists store IDs and obtains all database message IDs to reconcile stale objects, invoking store deletion for unreferenced data. These are per-user mechanisms; how FRY maps organizations, inboxes, and application views to Gluon users is undecided. [User implementation](https://github.com/ProtonMail/gluon/blob/2561acfbad82c2ef0f576a8df98b3269a0cbbfee/internal/backend/user.go).
+
+**The default database client serializes writes and blocks its reads during them.** SQLite `wrapTx` holds an exclusive Go mutex from before beginning the transaction through commit/rollback. `Read` takes the corresponding read lock. Replacing the DB implementation could change this locking policy, but preserving correct mailbox/session updates would require validation. [SQLite client](https://github.com/ProtonMail/gluon/blob/2561acfbad82c2ef0f576a8df98b3269a0cbbfee/internal/db_impl/sqlite3/client.go).
+
+**Bulk ingestion exists, with consequential boundaries.** `applyMessagesCreated` accepts multiple messages. Inside one database write callback it builds creation/membership lists, writes literals in chunks with parallel store calls, creates database records, and adds mailbox memberships. Store concurrency per chunk is capped at twice `GOMAXPROCS`. Internal chunking does not commit each chunk separately. The callback also inserts a Gluon internal-ID header into the stored representation.
+
+For each mailbox, batch construction checks each incoming ID against a growing slice using `slices.ContainsFunc`. **Algorithmic inference:** an all-distinct batch targeting one mailbox produces quadratic comparison growth in this step. Thus one 500,000-message arrival batch should not automatically become one Gluon update. Large update objects, transaction duration, store latency, and session delays warrant measurements. The internal-header mutation is another reason to preserve the original independently. [Creation path](https://github.com/ProtonMail/gluon/blob/2561acfbad82c2ef0f576a8df98b3269a0cbbfee/internal/backend/connector_updates.go).
+
+**Snapshots materialize mailbox metadata.** `newSnapshot` requests mailbox snapshot rows, allocates a message list sized to the result, and inserts every message's IDs, UID, and flags. This is not lazy pagination of the selected mailbox's metadata. **Inference:** startup/select memory and time must be tested against retained mailbox population, multiplied across simultaneous selections and independent application views. This does not mean every complete email body resides in the snapshot. [Snapshot construction](https://github.com/ProtonMail/gluon/blob/2561acfbad82c2ef0f576a8df98b3269a0cbbfee/internal/state/snapshot.go).
+
+The snapshot list uses both an ordered slice and an ID map. Normal insertion requires ascending UIDs; UID lookup uses binary search. Removal shifts the remaining slice elements. **Inference:** deleting many early messages individually can create substantial copying work. These UID mechanics do not establish a requirement that filtering complete in SMTP-arrival order; FRY's publication ordering is a separate decision. [Snapshot list](https://github.com/ProtonMail/gluon/blob/2561acfbad82c2ef0f576a8df98b3269a0cbbfee/internal/state/snapshot_messages.go).
+
+## Targeted evidence to collect
+
+1. Replay a 500,000-message single-inbox batch at several explicitly hypothetical rates, then replace them with measured arrival rates. Sweep bounded update sizes and store latency; measure publication lag, transaction lock time, memory, CPU, and other clients' response times. Separate safe SMTP receipt from later IMAP publication.
+2. Repeat against increasing pre-existing mailbox populations, multiple application views, and concurrent sessions per application. Measure SELECT/reconnect, IDLE notifications, header/date/flag searches, FETCH, moves, and mass deletion. Verify view isolation and byte-exact original recovery.
+3. Kill the owning process/site during publication and reconnect clients. Check stable UID/UIDVALIDITY behavior, retry duplication, retained-original safety, cleanup cost, and the agreed five-minute recovery target.
+4. Run a hot inbox alongside small organizations to test fairness. Sharding users alone cannot split the serialized work of one Gluon user; whether bounded batching meets demand is unknown.
+
+Unresolved inputs include peak arrival rate, view/session counts, mailbox population after retention/deletion, search selectivity, folder operations, and exact client behavior. No search execution-plan audit, custom-backend comparison, implementation, or benchmark was performed. The evidence supports a focused Gluon spike before commitment, not rejection or selection of the library.

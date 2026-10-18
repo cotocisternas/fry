@@ -1,0 +1,12 @@
+# Native runtime/Buf pins. Source-built CLI graphs live in tooling/native/.
+[tools]
+"core:go" = "1.27.2"
+"core:node" = "26.12.0"
+"aqua:bufbuild/buf" = "1.74.0"
+
+[settings]
+auto_install = false
+exec_auto_install = false
+node.compile = false
+lockfile_platforms = ["linux-x64", "linux-arm64"]
+idiomatic_version_file_enable_tools = []

@@ -1,0 +1,535 @@
+syntax = "proto3";
+package fry.admin.v1;
+option go_package = "github.com/cotocisternas/fry/gen/admin/go/fry/admin/v1;adminv1";
+
+// Administrative metadata only; originals are downloaded as binary HTTP.
+service AdminService {
+  // Public provider availability; no configuration secrets.
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse);
+  // Local credentials issue a cookie session; audited before commit. No retry deduplication.
+  rpc Login(LoginRequest) returns (LoginResponse);
+  // Current authenticated identity, grants, CSRF token and absolute expiry.
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  // Revoke the current cookie session; completion does not cancel accepted mail.
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // Current grants restrict the visible organization metadata.
+  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc ListInboxes(ListInboxesRequest) returns (ListInboxesResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc ListSenderGrants(ListSenderGrantsRequest) returns (ListSenderGrantsResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc ListDomains(ListDomainsRequest) returns (ListDomainsResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc ListAliases(ListAliasesRequest) returns (ListAliasesResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc ListMailAccounts(ListMailAccountsRequest) returns (ListMailAccountsResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc ListSubmissionAccounts(ListSubmissionAccountsRequest) returns (ListSubmissionAccountsResponse);
+  // Organization configuration permission. Metadata only; original content requires separately audited HTTP access.
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  // Current grants scope audit metadata; descending ID pages of at most 100.
+  rpc ListAudits(ListAuditsRequest) returns (ListAuditsResponse);
+  // Global operator only. Credential verifiers and passwords are never returned.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  // Global operator creates; assigned manager renames. Authorization, change and audit commit together.
+  rpc PutOrganization(PutOrganizationRequest) returns (PutOrganizationResponse);
+  // Organization configuration permission. Inbox creation and audit commit together.
+  rpc CreateInbox(CreateInboxRequest) returns (CreateInboxResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc PutDomain(PutDomainRequest) returns (PutDomainResponse);
+  // Organization configuration permission. Current authority is checked by the application operation.
+  rpc PutAlias(PutAliasRequest) returns (PutAliasResponse);
+  // Organization content permission. Password verifier, access changes and audit commit together.
+  rpc PutMailAccount(PutMailAccountRequest) returns (PutMailAccountResponse);
+  // Organization configuration permission. Replaces the prior DNS challenge in an audited transaction.
+  rpc CreateSenderChallenge(CreateSenderChallengeRequest) returns (CreateSenderChallengeResponse);
+  // Organization configuration permission. DNS result and current policy are rechecked before audited grant commit.
+  rpc VerifySender(VerifySenderRequest) returns (VerifySenderResponse);
+  // Organization configuration permission. Blocks future acceptance; durable accepted mail remains queued.
+  rpc RevokeSender(RevokeSenderRequest) returns (RevokeSenderResponse);
+  // Global operator only, with an explicit reason. Grant and audit commit together.
+  rpc OverrideSender(OverrideSenderRequest) returns (OverrideSenderResponse);
+  // Organization configuration permission to disable; content permission to enable. Audited transaction.
+  rpc SetMailAccess(SetMailAccessRequest) returns (SetMailAccessResponse);
+  // Global operator only. Current authority checked before and after bounded member diagnostics.
+  rpc GetMemberStorage(GetMemberStorageRequest) returns (GetMemberStorageResponse);
+  // Organization configuration permission; counters are exact decimal strings.
+  rpc GetStorageUsage(GetStorageUsageRequest) returns (GetStorageUsageResponse);
+  // Organization configuration permission. Absent limit_bytes disables this advisory threshold.
+  rpc SetStorageQuota(SetStorageQuotaRequest) returns (SetStorageQuotaResponse);
+  // Organization configuration permission. Create-only credential; password never returned.
+  rpc CreateSubmissionAccount(CreateSubmissionAccountRequest) returns (CreateSubmissionAccountResponse);
+  // Organization configuration permission. Audited send-only sender policy update.
+  rpc SetSubmissionPolicy(SetSubmissionPolicyRequest) returns (SetSubmissionPolicyResponse);
+  // Organization configuration permission. Audited verifier rotation without enabling the credential.
+  rpc RotateSubmissionPassword(RotateSubmissionPasswordRequest) returns (RotateSubmissionPasswordResponse);
+  // Organization configuration permission. Audited send-only credential access update.
+  rpc SetSubmissionAccess(SetSubmissionAccessRequest) returns (SetSubmissionAccessResponse);
+  // Global operator only. Password reset revokes prior administrator sessions; audited transaction.
+  rpc PutUser(PutUserRequest) returns (PutUserResponse);
+  // Global operator only. Replaces local grants; preserves OIDC grants and an enabled operator.
+  rpc ReplaceGrants(ReplaceGrantsRequest) returns (ReplaceGrantsResponse);
+  // Global operator only. Changes access and invalidates prior sessions; preserves an enabled operator.
+  rpc SetEnabled(SetEnabledRequest) returns (SetEnabledResponse);
+}
+
+message Grant {
+  string scope = 1;
+  bool content = 2;
+  string source = 3;
+}
+
+message Identity {
+  string id = 1;
+  string name = 2;
+  repeated Grant grants = 3;
+  string csrf = 4;
+  string expires = 5;
+}
+
+message Organization {
+  string id = 1;
+  string name = 2;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string method = 3;
+  bool enabled = 4;
+  repeated Grant grants = 5;
+}
+
+message Inbox {
+  string id = 1;
+  string organization = 2;
+  int64 messages = 3;
+}
+
+message Message {
+  string id = 1;
+  int64 size = 2;
+  string received = 3;
+  string state = 4;
+}
+
+message Audit {
+  int64 id = 1;
+  string at = 2;
+  string actor = 3;
+  string action = 4;
+  string organization = 5;
+  string target = 6;
+  string outcome = 7;
+}
+
+message SenderChallenge {
+  string id = 1;
+  string organization = 2;
+  string scope = 3;
+  string dns_name = 4;
+  string txt_value = 5;
+  string expires_at = 6;
+}
+
+message SenderGrant {
+  string id = 1;
+  string organization = 2;
+  string scope = 3;
+  int64 version = 4;
+  bool active = 5;
+  string evidence = 6;
+  string actor = 7;
+  string reason = 8;
+  optional string verified_at = 9;
+}
+
+message StorageUsage {
+  string organization = 1;
+  string retained_originals = 2;
+  string retained_bytes = 3;
+  optional string limit_bytes = 4;
+  string policy_version = 5;
+  string measured_at = 6;
+  optional string sampled_at = 7;
+  optional string sampled_bytes = 8;
+  optional string sampled_originals = 9;
+  optional string sampled_policy_version = 10;
+  bool alert_active = 11;
+  bool sample_stale = 12;
+  optional string last_transition_at = 13;
+  optional string last_transition_state = 14;
+}
+
+message Domain {
+  string name = 1;
+  string organization = 2;
+  string catch_all = 3;
+  bool enabled = 4;
+}
+
+message Alias {
+  string address = 1;
+  string organization = 2;
+  repeated string inboxes = 3;
+  bool enabled = 4;
+}
+
+message Account {
+  string username = 1;
+  string organization = 2;
+  string inbox = 3;
+  bool enabled = 4;
+}
+
+message SubmissionAccount {
+  string username = 1;
+  string organization = 2;
+  bool enabled = 3;
+  int64 version = 4;
+  repeated string authorized_senders = 5;
+  repeated string authorized_domains = 6;
+}
+
+message MemberStorageSnapshot {
+  string member = 1;
+  string sql_snapshot_at = 2;
+  MemberStorageProfile profile = 3;
+  MemberStorageCurrent current = 4;
+  MemberStorageOwner owner = 5;
+  repeated MemberStorageFile files = 6;
+  optional string next_file = 7;
+  MemberStorageRuntime runtime = 8;
+}
+
+message MemberStorageProfile {
+  bool bounded = 1;
+  bool limits_frozen = 2;
+  string max_message_bytes = 3;
+  string max_concurrent_appends = 4;
+  string max_bytes = 5;
+  string max_records = 6;
+  string max_file_bytes = 7;
+  string staging_reserved_bytes = 8;
+  string lane_version = 9;
+  string lane_count = 10;
+}
+
+message MemberStorageCurrent {
+  string file_id = 1;
+  string charged_bytes = 2;
+  optional string reserved_records = 3;
+  optional string reserved_record_bytes = 4;
+  optional bool can_fit_max_record_snapshot = 5;
+  repeated MemberStorageLane lanes = 6;
+}
+
+message MemberStorageLane {
+  string lane = 1;
+  string record_ceiling = 2;
+  string byte_ceiling = 3;
+  string reserved_records = 4;
+  string reserved_bytes = 5;
+}
+
+message MemberStorageOwner {
+  optional string epoch = 1;
+  optional bool closed = 2;
+}
+
+message MemberStorageFile {
+  string file_id = 1;
+  string state = 2;
+  string charged_bytes = 3;
+  optional string sealed_records = 4;
+  optional string rewrite_job = 5;
+}
+
+message MemberStorageRuntime {
+  string status = 1;
+  string checked_at = 2;
+  optional string sampled_at = 3;
+  string member = 4;
+  string failure_domain = 5;
+  optional string bound_owner_epoch = 6;
+  optional string owner_epoch = 7;
+  optional string current_file = 8;
+  optional bool closed = 9;
+  optional bool frozen = 10;
+  optional bool closure_uncertain = 11;
+}
+
+message GetConfigRequest {
+}
+message GetConfigResponse {
+  bool oidc = 1;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+message LoginResponse {
+  Identity result = 1;
+}
+
+message GetSessionRequest {
+}
+message GetSessionResponse {
+  Identity result = 1;
+}
+
+message LogoutRequest {
+}
+message LogoutResponse {
+  bool ok = 1;
+}
+
+message ListOrganizationsRequest {
+}
+message ListOrganizationsResponse {
+  repeated Organization items = 1;
+}
+
+message ListInboxesRequest {
+  string organization = 1;
+}
+message ListInboxesResponse {
+  repeated Inbox items = 1;
+}
+
+message ListSenderGrantsRequest {
+  string organization = 1;
+}
+message ListSenderGrantsResponse {
+  repeated SenderGrant items = 1;
+}
+
+message ListDomainsRequest {
+  string organization = 1;
+}
+message ListDomainsResponse {
+  repeated Domain items = 1;
+}
+
+message ListAliasesRequest {
+  string organization = 1;
+}
+message ListAliasesResponse {
+  repeated Alias items = 1;
+}
+
+message ListMailAccountsRequest {
+  string organization = 1;
+}
+message ListMailAccountsResponse {
+  repeated Account items = 1;
+}
+
+message ListSubmissionAccountsRequest {
+  string organization = 1;
+}
+message ListSubmissionAccountsResponse {
+  repeated SubmissionAccount items = 1;
+}
+
+message ListMessagesRequest {
+  string organization = 1;
+  string after = 2;
+}
+message ListMessagesResponse {
+  repeated Message items = 1;
+}
+
+message ListAuditsRequest {
+  int64 before = 1;
+}
+message ListAuditsResponse {
+  repeated Audit items = 1;
+}
+
+message ListUsersRequest {
+}
+message ListUsersResponse {
+  repeated User items = 1;
+}
+
+message PutOrganizationRequest {
+  string id = 1;
+  string name = 2;
+}
+message PutOrganizationResponse {
+  Organization result = 1;
+}
+
+message CreateInboxRequest {
+  string id = 1;
+  string organization = 2;
+}
+message CreateInboxResponse {
+  Inbox result = 1;
+}
+
+message PutDomainRequest {
+  string name = 1;
+  string organization = 2;
+  string catch_all = 3;
+  bool enabled = 4;
+}
+message PutDomainResponse {
+  Domain result = 1;
+}
+
+message PutAliasRequest {
+  string address = 1;
+  string organization = 2;
+  repeated string inboxes = 3;
+  bool enabled = 4;
+}
+message PutAliasResponse {
+  Alias result = 1;
+}
+
+message PutMailAccountRequest {
+  string username = 1;
+  string organization = 2;
+  string inbox = 3;
+  bool enabled = 4;
+  string password = 5;
+}
+message PutMailAccountResponse {
+  Account result = 1;
+}
+
+message CreateSenderChallengeRequest {
+  string organization = 1;
+  string scope = 2;
+}
+message CreateSenderChallengeResponse {
+  SenderChallenge result = 1;
+}
+
+message VerifySenderRequest {
+  string organization = 1;
+  string challenge = 2;
+}
+message VerifySenderResponse {
+  SenderGrant result = 1;
+}
+
+message RevokeSenderRequest {
+  string organization = 1;
+  string scope = 2;
+  string reason = 3;
+}
+message RevokeSenderResponse {
+  bool ok = 1;
+}
+
+message OverrideSenderRequest {
+  string organization = 1;
+  string scope = 2;
+  string reason = 3;
+}
+message OverrideSenderResponse {
+  SenderGrant result = 1;
+}
+
+message SetMailAccessRequest {
+  string organization = 1;
+  string username = 2;
+  bool enabled = 3;
+}
+message SetMailAccessResponse {
+  bool ok = 1;
+}
+
+message GetMemberStorageRequest {
+  string member = 1;
+  string after = 2;
+  int32 limit = 3;
+}
+message GetMemberStorageResponse {
+  MemberStorageSnapshot result = 1;
+}
+
+message GetStorageUsageRequest {
+  string organization = 1;
+}
+message GetStorageUsageResponse {
+  StorageUsage result = 1;
+}
+
+message SetStorageQuotaRequest {
+  string organization = 1;
+  optional string limit_bytes = 2;
+}
+message SetStorageQuotaResponse {
+  bool ok = 1;
+}
+
+message CreateSubmissionAccountRequest {
+  string organization = 1;
+  string username = 2;
+  string password = 3;
+  repeated string authorized_senders = 4;
+  repeated string authorized_domains = 5;
+  bool enabled = 6;
+}
+message CreateSubmissionAccountResponse {
+  bool ok = 1;
+}
+
+message SetSubmissionPolicyRequest {
+  string organization = 1;
+  string username = 2;
+  repeated string authorized_senders = 3;
+  repeated string authorized_domains = 4;
+}
+message SetSubmissionPolicyResponse {
+  bool ok = 1;
+}
+
+message RotateSubmissionPasswordRequest {
+  string organization = 1;
+  string username = 2;
+  string password = 3;
+}
+message RotateSubmissionPasswordResponse {
+  bool ok = 1;
+}
+
+message SetSubmissionAccessRequest {
+  string organization = 1;
+  string username = 2;
+  bool enabled = 3;
+}
+message SetSubmissionAccessResponse {
+  bool ok = 1;
+}
+
+message PutUserRequest {
+  string username = 1;
+  string password = 2;
+  bool enabled = 3;
+}
+message PutUserResponse {
+  string id = 1;
+}
+
+message ReplaceGrantsRequest {
+  string user = 1;
+  repeated Grant grants = 2;
+}
+message ReplaceGrantsResponse {
+  bool ok = 1;
+}
+
+message SetEnabledRequest {
+  string user = 1;
+  bool enabled = 2;
+}
+message SetEnabledResponse {
+  bool ok = 1;
+}

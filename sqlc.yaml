@@ -1,0 +1,86 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema:
+      - db/schema/receiptstore.sql
+      - db/schema/admin.sql
+      - db/schema/maildirectory.sql
+      - db/sqlc_catalog.sql
+    queries: db/queries/admin
+    gen:
+      go:
+        package: dbgen
+        out: internal/admin/dbgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: timestamptz
+            go_type:
+              import: time
+              type: Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true
+  - engine: postgresql
+    schema:
+      - db/schema/receiptstore.sql
+      - db/schema/admin.sql
+      - db/schema/maildirectory.sql
+    queries: db/queries/maildirectory
+    gen:
+      go:
+        package: dbgen
+        out: internal/maildirectory/dbgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: timestamptz
+            go_type:
+              import: time
+              type: Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true
+  - engine: postgresql
+    schema:
+      - db/schema/receiptstore.sql
+      - db/schema/admin.sql
+      - db/schema/maildirectory.sql
+    queries: db/queries/receiptstore
+    gen:
+      go:
+        package: dbgen
+        out: internal/receiptstore/dbgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        emit_exported_queries: true
+        omit_unused_structs: true
+        overrides:
+          - db_type: timestamptz
+            go_type:
+              import: time
+              type: Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true
+          - db_type: timestamp
+            go_type:
+              import: time
+              type: Time
+          - db_type: timestamp
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true
