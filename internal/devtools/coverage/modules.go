@@ -88,6 +88,45 @@ func openMappedModule(repo *os.Root, mapping string) (localModule, error) {
 	return localModule{name: name, directory: directory, root: root}, nil
 }
 
+// openModules opens the measured root module followed by each validated mapping.
+// On error it closes every root it opened.
+func openModules(repo string, mappings []string) (modules []localModule, err error) {
+	repoRoot, err := openRepositoryRoot(repo)
+	if err != nil {
+		return nil, err
+	}
+	modules = []localModule{{directory: ".", root: repoRoot}}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, closeModules(modules))
+			modules = nil
+		}
+	}()
+	if modules[0].name, err = readModule(repoRoot); err != nil {
+		return modules, err
+	}
+	for _, mapping := range mappings {
+		mapped, openErr := openMappedModule(repoRoot, mapping)
+		if openErr != nil {
+			return modules, openErr
+		}
+		duplicate := duplicateModule(modules, mapped)
+		modules = append(modules, mapped)
+		if duplicate {
+			return modules, fmt.Errorf("duplicate module mapping %q", mapping)
+		}
+	}
+	return modules, nil
+}
+
+func closeModules(modules []localModule) error {
+	var err error
+	for _, module := range modules {
+		err = errors.Join(err, module.root.Close())
+	}
+	return err
+}
+
 func moduleForFile(modules []localModule, filename string) int {
 	selected := -1
 	for i, module := range modules {

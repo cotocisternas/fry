@@ -322,3 +322,31 @@ release/recovery rehearsals need their own evidence. A passing local check does
 not establish a hosted Actions result. The
 [onboarding record](validation/contributor-onboarding.md) states the exact
 committed baseline and commands independently executed in a fresh checkout.
+
+### Pre-push CI parity
+
+Before pushing, run the complete CI path on the final, unchanged tree with the
+[workflow's](../.github/workflows/ci.yml) environment, including its Go and tool
+caches inside the checkout, followed by its packaging step:
+
+```sh
+(
+  set -e
+  export GOMAXPROCS=2 FRY_TEST_STREAM=1 PYTHONDONTWRITEBYTECODE=1
+  export GOCACHE="$PWD/.artifacts/cache/go-build" GOMODCACHE="$PWD/.artifacts/cache/go-mod"
+  export npm_config_cache="$PWD/.artifacts/cache/npm" GOLANGCI_LINT_CACHE="$PWD/.artifacts/cache/lint"
+  make check
+  runtime=$(awk '$1 == "FROM" {print $2}' Dockerfile)
+  docker pull --platform linux/amd64 "$runtime"
+  make container IMAGE=fry:ci ARCH=amd64
+  docker run --rm --pull=never fry:ci -help
+)
+```
+
+For a pull request, also set `FRY_PROTO_BASE_REF` to the base commit, as CI does.
+Cache location is part of the environment: Go resolves some patterns by
+directory, so a module cache inside the checkout can change what a check selects
+(see [coverage accounting](validation/coverage-accounting.md#profiles-containing-local-dependency-modules)).
+A full pass on an earlier tree does not cover later edits; any code, test or gate
+change requires a new complete run. Module cache files are read-only; remove that
+cache with `go clean -modcache` under the same `GOMODCACHE`.

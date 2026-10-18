@@ -154,13 +154,15 @@ Choose additional checks by the files and contracts involved:
 - Documentation-only changes: verify local links and command claims. Go lint and
   runtime tests do not validate prose.
 
-CI runs `make check` after explicit native setup and explicit dependency-image pulls.
-Use it locally to reproduce the CI validation suite; focused commands above provide
-faster, partial evidence while developing. It includes the existing-code baseline,
-browser, security and protobuf checks. See
-[CI and local verification](docs/development.md#ci-and-local-verification) for
-their prerequisites and artifacts. Report the commands, source commit, skipped
-prerequisites and any selection flags in the PR.
+CI runs `make check` after explicit native setup and explicit dependency-image pulls,
+then packages the amd64 container. It includes the existing-code baseline,
+browser, security and protobuf checks. Focused commands above provide faster,
+partial evidence while developing. Before pushing, run the complete CI path
+locally on the final tree, using CI's environment and cache layout; see
+[pre-push CI parity](docs/development.md#pre-push-ci-parity). A full pass
+on an earlier tree does not cover later edits: rerun the complete path after any
+code, test or gate change, not only the focused delta. Report the commands, source
+commit, skipped prerequisites and any selection flags in the PR.
 
 `make baseline-check` reproduces the existing-code baseline when that full
 comparison is needed. Release verification remains separate;

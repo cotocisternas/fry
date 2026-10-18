@@ -318,6 +318,15 @@ func TestCLIRejectInvalidModuleMappings(t *testing.T) {
 				out.Len() != 0 {
 				t.Fatalf("invalid mapping accepted: err=%v report=%s", err, &out)
 			}
+			// The instrumentation scope uses the same validation as accounting.
+			if err := run(
+				[]string{"-repo", root, "-print-coverpkg", "-module", mapping},
+				&out,
+				&diagnostics,
+			); err == nil ||
+				out.Len() != 0 {
+				t.Fatalf("invalid mapping scoped: err=%v scope=%s", err, &out)
+			}
 		})
 	}
 }
@@ -369,6 +378,29 @@ func TestCLIModuleBoundaries(t *testing.T) {
 			}
 			requireCoverageNoError(t, err)
 			checkBoundaryReport(t, out.Bytes(), tc.name == "unused scope is explicit")
+		})
+	}
+}
+
+func TestCLIRejectMixedModes(t *testing.T) {
+	root, profile := fixture(t)
+	write(t, root, "coverage.out", "mode: set\nexample.test/repo/pkg/hand.go:3.1,3.28 2 1\n")
+	write(t, root, "floors.json", `{"packages":{"example.test/repo/pkg":0}}`)
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"scope with profile", []string{"-print-coverpkg", "-profile", profile}},
+		{"scope with floors", []string{"-print-coverpkg", "-floors", filepath.Join(root, "floors.json")}},
+		{"scope with argument", []string{"-print-coverpkg", "extra"}},
+		{"floors without profile", []string{"-floors", filepath.Join(root, "floors.json")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out, diagnostics bytes.Buffer
+			err := run(append([]string{"-repo", root}, tc.args...), &out, &diagnostics)
+			if err == nil || out.Len() != 0 {
+				t.Fatalf("mixed mode accepted: err=%v output=%s", err, &out)
+			}
 		})
 	}
 }

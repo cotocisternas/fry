@@ -18,6 +18,9 @@ it by default; direct reporter invocation without `-floors` is accounting only.
 Options:
 
 - `-profile FILE`: required Go coverprofile, with `set`, `count` or `atomic` mode.
+- `-print-coverpkg`: instead of reporting, print the `go test -coverpkg` value
+  for the root and mapped modules (see below). It accepts `-repo` and `-module`
+  only and validates mappings the same way.
 - `-repo DIR`: measured module root containing `go.mod`; defaults to `.`.
 - `-floors FILE`: optional reviewed JSON floor manifest for root packages; enables enforcement.
 - `-module IMPORT=DIR`: repeatable explicit local dependency module mapping. `DIR`
@@ -67,11 +70,20 @@ rerun; this reporter never repairs or relaxes ranges to accept a stale profile.
 
 ## Profiles containing local dependency modules
 
-Root test profiles can contain instrumented dependency packages from the local
-IMAP and SMTP replacements, even when the root test invocation uses
-`-coverpkg=./...`. Keep the raw profile unchanged. Account for every record with
-explicit mappings rather than removing foreign records or adding them to the
-root denominator:
+Root test profiles contain instrumented dependency packages from the local IMAP
+and SMTP replacements. `make coverage` takes its `-coverpkg` value from
+`-print-coverpkg` with the same `-repo` and `-module` arguments as the report, so
+it instruments exactly the accounted modules by import path:
+`github.com/cotocisternas/fry/...,github.com/emersion/go-imap/v2/...,github.com/emersion/go-smtp/...`.
+Do not use `-coverpkg=./...`. Go matches a relative pattern against the directory
+of every loaded package, so it also instruments downloaded modules whenever
+GOMODCACHE is inside the checkout, as in CI (`.artifacts/cache/go-mod`). Their
+records belong to no mapping and the reporter rejects them. They also enter the
+statement totals behind `go test`'s per-package `coverage:` summary lines, so
+those percentages then differ from runs with the cache outside the checkout.
+
+Keep the raw profile unchanged. Account for every record with explicit mappings
+rather than removing foreign records or adding them to the root denominator:
 
 ```sh
 go run ./internal/devtools/coverage \

@@ -62,22 +62,25 @@ case "$action" in
     [[ "$coverage_dir" == "$repo_root/"* ]] || incomplete 'Coverage outputs must be inside the checkout for auditable local evidence.'
     profile="$coverage_dir/root.out"
     report="$coverage_dir/root.json"
+    # Root tests instrument the local replacement modules too. Keep their records
+    # in the raw profile and report them separately from root floors; they do not
+    # replace execution of the complete fork suites.
+    reporter=("$tool" go run ./internal/devtools/coverage -repo "$repo_root"
+      -module github.com/emersion/go-imap/v2=third_party/go-imap
+      -module github.com/emersion/go-smtp=third_party/go-smtp)
     if [[ "$action" == coverage ]]; then
-      # Root tests can instrument local replacement dependencies. Keep their
-      # records in the raw profile and report them separately from root floors;
-      # they do not replace execution of the complete fork suites.
       # Invalidate prior evidence before running; a failed test run must not
       # leave an old successful JSON report beside a new partial profile.
       : > "$profile"
       : > "$report"
+      # Instrument by module import path, not -coverpkg=./...: a relative pattern
+      # also selects downloaded modules when GOMODCACHE is inside the checkout.
+      coverpkg=$("${reporter[@]}" -print-coverpkg)
       FRY_TEST_TIMEOUT=${FRY_TEST_TIMEOUT:-5m} "$tool" receipts "$@" \
-        -race -covermode=atomic -coverpkg=./... "-coverprofile=$profile"
+        -race -covermode=atomic "-coverpkg=$coverpkg" "-coverprofile=$profile"
     fi
-    report_args=(-repo "$repo_root" -profile "$profile"
-      -module github.com/emersion/go-imap/v2=third_party/go-imap
-      -module github.com/emersion/go-smtp=third_party/go-smtp)
-    report_args+=(-floors "${FRY_COVERAGE_FLOORS:-$repo_root/tooling/coverage-floors.json}")
-    "$tool" go run ./internal/devtools/coverage "${report_args[@]}" > "$report"
+    "${reporter[@]}" -profile "$profile" \
+      -floors "${FRY_COVERAGE_FLOORS:-$repo_root/tooling/coverage-floors.json}" > "$report"
     echo "Root coverage profile: $profile"
     echo "Root coverage report: $report"
     ;;

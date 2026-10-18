@@ -64,9 +64,10 @@ func main() {
 func run(args []string, out, diagnostics io.Writer) error {
 	flags := flag.NewFlagSet("coverage", flag.ContinueOnError)
 	flags.SetOutput(diagnostics)
-	profile := flags.String("profile", "", "Go coverprofile (required)")
+	profile := flags.String("profile", "", "Go coverprofile (required unless -print-coverpkg)")
 	repo := flags.String("repo", ".", "root of the measured Go module")
 	floors := flags.String("floors", "", "optional JSON root-package handwritten percentage floors")
+	printScope := flags.Bool("print-coverpkg", false, "print the go test -coverpkg value for the measured modules")
 	var mappings []string
 	flags.Func(
 		"module",
@@ -79,15 +80,24 @@ func run(args []string, out, diagnostics io.Writer) error {
 		}
 		return err
 	}
-	if *profile == "" || flags.NArg() != 0 {
-		return errors.New("usage: coverage -profile FILE [-repo DIR] [-floors FILE] [-module IMPORT=DIR ...]")
+	switch {
+	case flags.NArg() != 0:
+	case *printScope && *profile == "" && *floors == "":
+		return printCoverPackages(out, *repo, mappings)
+	case !*printScope && *profile != "":
+		return writeReport(out, *profile, *repo, *floors, mappings)
 	}
-	result, err := measure(*profile, *repo, mappings...)
+	return errors.New("usage: coverage -profile FILE [-repo DIR] [-floors FILE] [-module IMPORT=DIR ...]\n" +
+		"       coverage -print-coverpkg [-repo DIR] [-module IMPORT=DIR ...]")
+}
+
+func writeReport(out io.Writer, profile, repo, floors string, mappings []string) error {
+	result, err := measure(profile, repo, mappings...)
 	if err != nil {
 		return err
 	}
-	if *floors != "" {
-		manifest, err := readFloors(*floors)
+	if floors != "" {
+		manifest, err := readFloors(floors)
 		if err != nil {
 			return err
 		}
@@ -102,29 +112,34 @@ func run(args []string, out, diagnostics io.Writer) error {
 	return nil
 }
 
+// printCoverPackages writes the go test -coverpkg value that instruments exactly
+// the modules measure accounts for. Import-path patterns select by module
+// identity. A relative ./... pattern instead selects every loaded package whose
+// directory is below the checkout, including downloaded modules when GOMODCACHE
+// is placed there; no mapping can account for those records.
+func printCoverPackages(out io.Writer, repo string, mappings []string) (err error) {
+	modules, err := openModules(repo, mappings)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, closeModules(modules)) }()
+	patterns := make([]string, len(modules))
+	for i, module := range modules {
+		patterns[i] = module.name + "/..."
+	}
+	if _, err := fmt.Fprintln(out, strings.Join(patterns, ",")); err != nil {
+		return fmt.Errorf("write coverpkg: %w", err)
+	}
+	return nil
+}
+
 func measure(profile, repo string, mappings ...string) (result report, err error) {
-	repoRoot, err := openRepositoryRoot(repo)
+	modules, err := openModules(repo, mappings)
 	if err != nil {
 		return result, err
 	}
-	defer func() { err = errors.Join(err, repoRoot.Close()) }()
-	module, err := readModule(repoRoot)
-	if err != nil {
-		return result, err
-	}
-	result.Module = module
-	modules := []localModule{{name: module, directory: ".", root: repoRoot}}
-	for _, mapping := range mappings {
-		mapped, openErr := openMappedModule(repoRoot, mapping)
-		if openErr != nil {
-			return result, openErr
-		}
-		defer func() { err = errors.Join(err, mapped.root.Close()) }()
-		if duplicateModule(modules, mapped) {
-			return result, fmt.Errorf("duplicate module mapping %q", mapping)
-		}
-		modules = append(modules, mapped)
-	}
+	defer func() { err = errors.Join(err, closeModules(modules)) }()
+	result.Module = modules[0].name
 	scanner, mode, err := openProfile(profile)
 	if err != nil {
 		return result, err
