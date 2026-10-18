@@ -304,10 +304,22 @@ class ProcessLifetime(unittest.TestCase):
 
     def test_cleanup_failure_is_not_suppressed(self):
         with tempfile.TemporaryDirectory() as temporary:
-            with mock.patch('shutil.rmtree', side_effect=OSError('checked cleanup failed')):
-                with self.assertRaisesRegex(OSError, 'checked cleanup failed'):
-                    with scratch_directory(temporary, 'failure-'):
-                        pass
+            owned = tempfile.TemporaryDirectory(dir=temporary, prefix='failure-')
+            try:
+                # Inject at the cleanup API, not tempfile's platform-specific
+                # choice of tree remover. Keep the real context-manager exit.
+                with mock.patch('scripts.lib.processes.tempfile.TemporaryDirectory',
+                                return_value=owned) as create, \
+                        mock.patch.object(owned, 'cleanup',
+                                          side_effect=OSError('checked cleanup failed')) as cleanup:
+                    with self.assertRaisesRegex(OSError, 'checked cleanup failed'):
+                        with scratch_directory(temporary, 'failure-') as root:
+                            self.assertEqual(root, Path(owned.name))
+                    cleanup.assert_called_once_with()
+                    create.assert_called_once_with(dir=temporary, prefix='failure-',
+                                                   ignore_cleanup_errors=False)
+            finally:
+                owned.cleanup()
 
     def test_port_is_reserved_until_handoff(self):
         with reserved_loopback_port() as port:
