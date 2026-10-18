@@ -6,13 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
+	"runtime"
 	"syscall"
+	"time"
 
 	deps "github.com/cotocisternas/fry/tooling/testdeps"
 
+	"github.com/moby/moby/client"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/testcontainers/testcontainers-go"
 )
 
@@ -29,13 +31,13 @@ func main() {
 
 func execute(ctx context.Context, args []string) (int, error) {
 	if len(args) == 0 {
-		return 2, fmt.Errorf("usage: test-deps.sh build|check|image postgres|image ryuk|run -- COMMAND [ARGS...]")
+		return 2, fmt.Errorf("usage: test-deps.sh pull|check|image postgres|image ryuk|run -- COMMAND [ARGS...]")
 	}
 	switch args[0] {
 	case "image":
 		return printImage(args[1:])
-	case "build":
-		err := build(ctx)
+	case "pull":
+		err := pull(ctx)
 		return errorCode(err), err
 	case "check":
 		err := check(ctx)
@@ -59,11 +61,11 @@ func printImage(args []string) (int, error) {
 	if len(args) != 1 {
 		return 2, fmt.Errorf("image requires postgres or ryuk")
 	}
-	tag, _, err := deps.Image(args[0])
+	ref, err := deps.Image(args[0])
 	if err != nil {
 		return 2, err
 	}
-	_, err = fmt.Fprintln(os.Stdout, tag)
+	_, err = fmt.Fprintln(os.Stdout, ref)
 	return errorCode(err), err
 }
 
@@ -74,26 +76,38 @@ func errorCode(err error) int {
 	return 0
 }
 
-func build(ctx context.Context) error {
-	root := os.Getenv("FRY_TESTDEPS_DIR")
-	if root == "" {
-		return fmt.Errorf("build requires scripts/test-deps.sh")
+func pull(ctx context.Context) error {
+	pullCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	docker, err := testcontainers.NewDockerClientWithOpts(pullCtx)
+	if err != nil {
+		return err
 	}
+	err = pullImages(pullCtx, docker)
+	return errors.Join(err, docker.Close())
+}
+
+func pullImages(ctx context.Context, docker client.APIClient) error {
 	for _, kind := range []string{"postgres", "ryuk"} {
-		tag, recipe, err := deps.Image(kind)
+		ref, err := deps.Image(kind)
 		if err != nil {
 			return err
 		}
-		// Owner: FRY tooling; explicit source build uses the checkout path from its wrapper. Revisit
-		// 2027-10-18.
-		//nolint:gosec // Reviewed call; rationale above.
-		command := exec.CommandContext(ctx, "bash", filepath.Join(root, "images/build.sh"), kind, tag, recipe)
-		command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stderr, os.Stderr
-		if err := command.Run(); err != nil {
-			return fmt.Errorf("build %s: %w", kind, err)
+		if _, err := fmt.Fprintln(os.Stderr, "Pulling", ref); err != nil {
+			return err
+		}
+		response, err := docker.ImagePull(ctx, ref, client.ImagePullOptions{
+			Platforms: []v1.Platform{{OS: "linux", Architecture: runtime.GOARCH}},
+		})
+		if err != nil {
+			return fmt.Errorf("pull %s: %w", kind, err)
+		}
+		if err := response.Wait(ctx); err != nil {
+			return fmt.Errorf("pull %s: %w", kind, err)
 		}
 	}
-	return check(ctx)
+	_, err := deps.Check(ctx, docker)
+	return err
 }
 
 func check(ctx context.Context) error {

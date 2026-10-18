@@ -27,7 +27,7 @@ Use a Linux amd64 or arm64 checkout with these host prerequisites already instal
   The doctor checks these even for a Go-only onboarding run; race/cgo tests need
   the compiler, and Python/OpenSSL support generation and process rehearsals.
 - The Docker CLI and an accessible Docker daemon for the demo, integration tests
-  and source-built dependency images. `docker info` must succeed as your user.
+  and upstream dependency images. `docker info` must succeed as your user.
 
 Install host packages and mise before running setup. Normal setup does not
 install OS packages or configure the Docker daemon. The explicit
@@ -39,11 +39,7 @@ repository before cloning.
 Run these commands from the checkout in Bash:
 
 ```bash
-make setup-tools       # install pinned native tools and locked generator dependencies
-source tooling/testdeps/images/pins.env
-docker pull "$FRY_TESTDEPS_BASE"  # explicitly provision the permitted Linux base
-make test-deps-build   # build FRY's PostgreSQL and cleanup-helper images locally
-# Once the base is present, make setup combines setup-tools and test-deps-build.
+make setup            # install native tools and pull pinned upstream dependency images
 make doctor
 make build
 make generate-check
@@ -62,31 +58,26 @@ tools without automatically installing a missing tool or upgrading it. Mise shel
 activation is optional; wrappers establish the environment for each invocation.
 Use the same Make commands in CI rather than independently reproducing recipes.
 
-Test dependency images are built from repository Dockerfiles and pinned sources.
-The image builder requires the exact `FRY_TESTDEPS_BASE` from
-[`pins.env`](../tooling/testdeps/images/pins.env) to exist locally; it fails with
-`Pinned Linux base unavailable locally` otherwise. The explicit `docker pull`
-above provisions that digest-pinned Debian base. PostgreSQL **18.6** is compiled
-inside it using authenticated snapshot packages; Ryuk is compiled from its pinned
-source commit into a scratch image. Explicit builds can download verified source
-archives and build dependencies. Test execution accepts only the resulting local,
-recipe-labelled images and forbids image pulls. See the
-[fixture lifecycle reference](../tooling/testdeps/README.md) for source pins,
-image identities, provenance checks and cleanup behavior.
+PostgreSQL **18.6** and the Testcontainers Ryuk cleanup helper use digest-pinned
+upstream images. FRY owns the Testcontainers fixture code rather than using
+service-specific fixture templates. Explicit `make test-deps-pull` downloads the
+selected images; normal tests require verified local digests and run immutable
+image IDs without pulling. See the
+[fixture lifecycle reference](../tooling/testdeps/README.md) for image pins,
+platform checks and cleanup behavior.
 
 Native generator binaries and npm dependencies live under the ignored
 `.artifacts/native-toolchain/` in each checkout. Mise installations, Go caches and
-verified test-image build inputs may be reused from host caches; copying another
+downloaded dependency images may be reused from host caches; copying another
 checkout's `.artifacts` is unnecessary. Rerun `make setup-tools` after a tool or
 lockfile change when a command reports stale or missing prepared inputs.
-For `local ... image unavailable`, run `make test-deps-build` with the pinned
-base present. For an occupied demo port, use `FRY_DEMO_HTTP_PORT=8081 make demo`.
+For `local ... image unavailable`, run `make test-deps-pull`. For an occupied demo port, use `FRY_DEMO_HTTP_PORT=8081 make demo`.
 
 For host-only compilation/generation, `make setup-tools doctor build generate-check`
 does not need Docker. The demo and required integration checks do.
 
 Valkey is not currently a FRY dependency. A future service must add its own
-repository-owned image recipe and fixture when the corresponding feature needs it.
+digest-pinned upstream image and FRY-owned fixture when the corresponding feature needs it.
 
 ## Daily commands
 
@@ -131,7 +122,7 @@ Go package helpers alone cannot share a process-wide container across `go test
 ./...`, because packages execute in separate test binaries.
 
 The runner owns cleanup and diagnostic logs, including on failure and interruption.
-Required integration commands fail when Docker or the locally built images are
+Required integration commands fail when Docker or the pinned upstream images are
 unavailable. A skipped database test in the lightweight command is not integration
 verification. No test command should connect to a production database.
 
@@ -158,11 +149,12 @@ application coverage.
 
 ## Dependency and process rehearsals
 
-`make test-deps-check` checks local image availability and recipe metadata.
+`make test-deps-check` checks local image availability, upstream digests and host architecture.
 `make test-deps-test` runs the fixture lifecycle regressions under the race
 detector; `make test-deps-lint` runs strict lint and vet on that separate module.
 `make test-scripts` runs Python unittest discovery under `scripts/tests` through
-the repository toolchain without Docker. `make test-script-processes` remains
+the repository toolchain without Docker, plus the native container-context
+regressions under `tooling/container`. `make test-script-processes` remains
 the focused subset for command timeouts and descendant cleanup; that subset is
 included in `make baseline-check` alongside the dependency checks.
 The shared runner is also used by mail smoke tests, the disposable administration demo and
@@ -199,8 +191,16 @@ Only `containers` and `kubernetes` accept an image argument; the default is
 prerequisites and the separate opt-in AWS probe are in the
 [script guide](../scripts/README.md).
 
+Build deployment images with `make container IMAGE=fry:local-test`; set
+`ARCH=amd64` or `ARCH=arm64` to choose the Linux target. The wrapper compiles all
+four binaries natively with the pinned Go toolchain and disabled cgo, then
+packages fresh outputs and dependency notices into the pinned distroless image.
+Docker receives only that output context; it does not compile FRY. See the
+[container build reference](validation/local-containers.md) for prerequisites
+and validation limits.
+
 Container and Kubernetes rehearsals intentionally still run FRY in containers.
-They consume the same locally built PostgreSQL image. Building a runtime image,
+They consume the same pinned upstream PostgreSQL image. Building a runtime image,
 creating a local cluster or running a load rehearsal is an explicit action, not
 part of formatting or code generation. These checks do not provision AWS or
 establish multi-zone durability and production scale.
@@ -219,8 +219,8 @@ staging and output guards; it is not a container security sandbox.
 
 Upgrade native pins and their lock entries together. Review upstream release
 and checksum evidence, regenerate through the explicit setup path, and rerun
-lint, tests and generation checks. Upgrade image source/base pins through an
-explicit local rebuild and fixture regression run. Existing published-version
+lint, tests and generation checks. Upgrade upstream image digests through an
+explicit pull and fixture regression run. Existing published-version
 compatibility and native arm64 release execution remain independent evidence.
 
 `make proto-drift-check` verifies current schema lint/build and generated output.
@@ -239,8 +239,8 @@ the policy rejects a removed RPC and accepts an additive message.
 
 The [GitHub Actions contributor workflow](../.github/workflows/ci.yml) runs on
 pull requests, pushes to `main` and manual dispatch, on Ubuntu 24.04 Linux amd64
-with pinned checkout and mise setup. After the native tools, pinned base and
-source-built images above are prepared, run:
+with pinned checkout and mise setup. After the native tools and pinned upstream
+images above are prepared, run:
 
 ```sh
 make security-setup
@@ -257,8 +257,10 @@ install OS packages. On Ubuntu 24.04, CI uses
 Linux libraries too. On other distributions, prepare equivalent libraries with
 the distribution's package manager. Missing browser prerequisites fail the gate.
 
-The PostgreSQL and Ryuk images are source-built on the runner. No service
-credentials or production database are needed.
+The runner explicitly pulls the pinned PostgreSQL and Ryuk images. No service
+credentials or production database are needed. After the contributor gate, CI
+explicitly pulls the pinned distroless runtime, runs `make container` for amd64
+and checks the resulting executable with `-help`; it does not publish the image.
 
 `make check` orchestrates the existing-code checks, browser, security and
 protobuf checks through [`scripts/tests/check.sh`](../scripts/tests/check.sh).

@@ -7,6 +7,11 @@ Run from the repository root only after `fry:local-test` passes
 scripts/smoke.sh kubernetes fry:local-test
 ```
 
+Build that image with `make container IMAGE=fry:local-test ARCH=amd64` after
+explicitly preparing native dependencies and the pinned runtime base; see
+[native packaging](../../../docs/validation/local-containers.md). The packaging
+command compiles on the host and copies only verified outputs into Distroless.
+
 **This command creates and deletes a new local kind cluster.** It does not use
 an existing kubeconfig/context or create AWS resources. The current profile
 requires Docker with `docker save --platform` support, Linux amd64, kind 0.33.0,

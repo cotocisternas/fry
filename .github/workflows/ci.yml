@@ -38,15 +38,17 @@ jobs:
           cache: false
       - name: Prepare native tools
         run: make setup-tools doctor
-      - name: Provision the pinned Linux base
-        run: |
-          source tooling/testdeps/images/pins.env
-          docker pull "$FRY_TESTDEPS_BASE"
-      - name: Build PostgreSQL and cleanup helper from verified sources
-        run: make test-deps-build
+      - name: Pull pinned upstream test dependency images
+        run: make test-deps-pull
       - name: Prepare security scanners
         run: make security-setup
       - name: Prepare Chromium
         run: make browser-setup BROWSER_SETUP_FLAGS=--with-deps
       - name: Run contributor checks
         run: make check
+      - name: Package native binaries in the runtime image
+        run: |
+          runtime=$(awk '$1 == "FROM" {print $2}' Dockerfile)
+          docker pull --platform linux/amd64 "$runtime"
+          make container IMAGE=fry:ci ARCH=amd64
+          docker run --rm --pull=never fry:ci -help

@@ -20,16 +20,19 @@ RUNNER = str(ROOT / 'scripts/test-deps.sh')
 
 
 def image(service='postgres'):
-    """Resolve an already-built repository image; never build or pull implicitly."""
+    """Verify an explicitly pulled upstream pin without building or pulling."""
     reference = subprocess.check_output([RUNNER, 'image', service], cwd=ROOT, text=True, timeout=180).strip()
+    tagged, digest = reference.rsplit('@', 1)
+    assert re.fullmatch(r'sha256:[0-9a-f]{64}', digest), 'dependency image must have a pinned digest'
     inspected = json.loads(subprocess.check_output(
         ['docker', 'image', 'inspect', reference], text=True, timeout=10))[0]
-    labels = inspected.get('Config', {}).get('Labels', {}) or {}
-    recipe = labels.get('io.fry.testdeps.recipe', '')
-    assert re.fullmatch(r'[0-9a-f]{64}', recipe), 'local dependency image lacks recipe provenance'
-    assert labels.get('io.fry.testdeps.kind') == service, 'local dependency image has wrong service provenance'
-    assert reference.rsplit(':', 1)[-1] == recipe[:24] + '-' + inspected['Architecture'], \
-        'local dependency image recipe differs from its content-derived reference'
+    # Docker may omit its default registry and official-image namespace.
+    expected = (tagged.rsplit(':', 1)[0] + '@' + digest).removeprefix('docker.io/').removeprefix('library/')
+    known = {value.removeprefix('docker.io/').removeprefix('library/')
+             for value in inspected.get('RepoDigests', []) or []}
+    assert expected in known, 'local dependency image differs from the pinned upstream digest'
+    assert inspected['Os'] == 'linux' and re.fullmatch(r'sha256:[0-9a-f]{64}', inspected['Id']), \
+        'local dependency image lacks a Linux content identity'
     return reference
 
 

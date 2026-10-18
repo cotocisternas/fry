@@ -32,11 +32,11 @@ func TestPostgresReadyAndRemoved(t *testing.T) {
 		t.Fatal(err)
 	}
 	var version string
-	if err := conn.QueryRow(ctx, "SELECT current_setting('server_version')").Scan(&version); err != nil {
+	if err := conn.QueryRow(ctx, "SELECT current_setting('server_version_num')").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != "18.6" {
-		t.Fatalf("server version = %q, want 18.6", version)
+	if version != "180006" {
+		t.Fatalf("server version number = %q, want 180006 (18.6)", version)
 	}
 	if err := conn.Close(ctx); err != nil {
 		t.Fatal(err)

@@ -28,5 +28,5 @@ FRY_COVERAGE_DIR="$evidence" ./scripts/quality.sh coverage -short
 ./scripts/quality.sh test-forks -race
 snapshot > "$evidence/source.after.sha256"
 cmp "$evidence/source.before.sha256" "$evidence/source.after.sha256"
-printf '%s\n' 'Existing-code baseline passed: native core -race -short, reviewed floors, complete fork race suites, lint/format/vet/build, SQL/RPC/browser generation and owned-image fixture tests; unchanged source inputs.' > "$evidence/PASSED"
+printf '%s\n' 'Existing-code baseline passed: native core -race -short, reviewed floors, complete fork race suites, lint/format/vet/build, SQL/RPC/browser generation and fixture lifecycle tests; unchanged source inputs.' > "$evidence/PASSED"
 cat "$evidence/PASSED"

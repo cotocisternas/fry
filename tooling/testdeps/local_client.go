@@ -62,5 +62,5 @@ func (c *localClient) ImagePull(
 	name string,
 	_ client.ImagePullOptions,
 ) (client.ImagePullResponse, error) {
-	return nil, fmt.Errorf("runtime image pulls are forbidden (%s); run scripts/test-deps.sh build", name)
+	return nil, fmt.Errorf("runtime image pulls are forbidden (%s); run scripts/test-deps.sh pull", name)
 }

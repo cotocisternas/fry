@@ -34,6 +34,7 @@ case "$action" in
     ;;
   test-scripts)
     PYTHONDONTWRITEBYTECODE=1 "$tool" exec python3 -m unittest discover -s scripts/tests -t . -p '*.py'
+    PYTHONDONTWRITEBYTECODE=1 "$tool" exec python3 -m unittest discover -s tooling/container -p 'test_*.py'
     ;;
   test-deps-lint)
     (cd "$repo_root/tooling/testdeps"; "$tool" lint run --config "$repo_root/.golangci.yml" ./...)
@@ -115,8 +116,8 @@ case "$action" in
     echo 'make demo; make smoke SCENARIO=smtp (scripts/smoke.sh --help lists scenarios)'
     echo 'scripts/bench.sh --help (opt-in measurements)'
     echo 'Script responsibilities and direct commands: scripts/README.md'
-    echo 'make setup (mise native tools + locally built test dependency images)'
-    echo 'make setup-tools doctor test-deps-build test-deps-check test-deps-test test-deps-lint native-tools-check'
+    echo 'make setup (mise native tools + pinned upstream test dependency images)'
+    echo 'make setup-tools doctor test-deps-pull test-deps-check test-deps-test test-deps-lint native-tools-check'
     echo 'make test-scripts (Docker-free script modules and lifecycle regressions)'
     echo 'make test-script-processes (focused subprocess cleanup regressions)'
     echo 'make lint-policy-check (prove style checks cover handwritten production and test code)'
@@ -124,8 +125,9 @@ case "$action" in
     echo 'make test test-integration test-race test-forks toolchain-versions'
     echo 'make baseline-check (existing-code baseline; not the complete PR gate)'
     echo 'make proto-bootstrap proto-tools-check proto-drift-check (generation checks; not released API compatibility)'
-    echo 'make test-image (alias for test-deps-build) coverage coverage-report'
-    echo 'Native mise tools; Docker runs test dependencies only. TEST_FLAGS=-short for short suites.'
+    echo 'make coverage coverage-report'
+    echo 'make container IMAGE=fry:local-test ARCH=amd64 (native binaries, distroless packaging)'
+    echo 'Native mise tools; Docker runs dependencies and deployment rehearsals. TEST_FLAGS=-short for short suites.'
     echo 'make browser-setup security-setup (explicit downloads for contributor checks)'
     echo 'make check (complete contributor gate); make release-check remains unavailable.'
     ;;

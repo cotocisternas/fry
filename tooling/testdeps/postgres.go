@@ -1,4 +1,4 @@
-// Package testdeps owns isolated, source-built dependencies for native FRY tests.
+// Package testdeps owns isolated dependencies for native FRY tests.
 package testdeps
 
 import (
@@ -28,7 +28,7 @@ type Postgres struct {
 	docker      client.APIClient
 }
 
-// Start requires prebuilt, verified local images, binds a random loopback port,
+// Start requires pinned, verified local images, binds a random loopback port,
 // and returns only after a SQL query succeeds through that actual TCP endpoint.
 func Start(ctx context.Context) (*Postgres, error) {
 	provider, err := testcontainers.NewDockerProvider()

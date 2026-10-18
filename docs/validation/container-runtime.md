@@ -7,16 +7,29 @@ This rehearsal runs the actual FRY image with a disposable PostgreSQL 18 contain
 
 ## Run
 
-Build the local image using the repository Dockerfile, then run:
+Prepare native tools/dependency caches and the pinned runtime base as described
+in [native container packaging](local-containers.md), then build and run:
 
 ```sh
-docker build -t fry:local-test .
-./scripts/smoke.sh containers
-# Optional already-built image tag:
+make container IMAGE=fry:local-test ARCH=amd64
+./scripts/test-deps.sh pull
 ./scripts/smoke.sh containers fry:local-test
 ```
 
-Docker, Python 3, and OpenSSL must be installed on the host. The script never builds the application image. It may pull only the pinned PostgreSQL fixture image if missing. All fixture containers, the private internal bridge and separate coordinator ingress bridge, and named member volumes have generated names and labels; cleanup uses those exact names, never global Docker pruning. Interrupts execute bounded cleanup. The signing CA key stays on the host outside the read-only runtime mount.
+Docker, Python 3, and OpenSSL must be installed on the host. Packaging compiles
+the four commands natively with pinned Go, then copies prepared outputs into
+Distroless. The smoke script consumes the already-built image and explicitly
+prepared official PostgreSQL fixture; it never builds the application image or
+pulls missing fixture images. All fixture containers, the private internal bridge
+and separate coordinator ingress bridge, and named member volumes have generated
+names and labels; cleanup uses those exact names, never global Docker pruning.
+Interrupts execute bounded cleanup. The signing CA key stays on the host outside
+the read-only runtime mount.
+
+The current crash-restart check compares the exact stored owner state before and
+after restart refusal. It does not depend on detailed error text from the member
+command, which now sanitizes startup errors. The historical checked flow and
+image identities below describe their original executions.
 
 The FRY containers use the image's default UID/GID 65532, a read-only root filesystem, all capabilities dropped, and `no-new-privileges`. The image provides `/var/lib/fry` owned by 65532 with mode 0700. Each member mounts a separate newly created named volume at that path; Docker's volume initialization supplies its initial ownership. Configuration, public certificates and **synthetic fixture private keys** are mounted read-only and made readable by the runtime UID. This permissive fixture-key readability is not a prescription for production secret permissions.
 
@@ -50,7 +63,7 @@ There is no dedicated health endpoint. Readiness checks in this runner observe p
 
 Shell/Python syntax checks passed. The first image rehearsal reached member and coordinator startup but stopped before protocol checks because Docker did not publish ports on the internal-only network. The runner now gives only the coordinator a second, regular ingress bridge. A bounded disposable container probe verified loopback host publishing with this dual-bridge topology and removed its resources. The corrected full rehearsal subsequently passed the protocol and lifecycle checks above. That result applies to the recorded image; later source changes are covered by their separately documented checks.
 
-Image inspection confirmed the four Linux/amd64 ELF executables contain no dynamic interpreter, the system CA bundle is present, and `/var/lib/fry` has mode 0700 with UID/GID 65532. Each command also started with `-help` under nonroot/read-only/no-network/capability-drop restrictions. The build uses digest-pinned official Go and Distroless images, disables implicit toolchain downloads, copies local module replacements, and preserves dependency notices; see [packaging research](../research/container-deployment.md). No image was pushed to a registry. The current smoke does not separately test unauthenticated member rejection, interrupted SMTP uploads, active IMAP termination, or persistent object-packing scratch volumes; existing protocol/process tests provide separate evidence for parts of those paths.
+Image inspection confirmed the four Linux/amd64 ELF executables contain no dynamic interpreter, the system CA bundle is present, and `/var/lib/fry` has mode 0700 with UID/GID 65532. Each command also started with `-help` under nonroot/read-only/no-network/capability-drop restrictions. That historical build used digest-pinned official Go and Distroless images, disabled implicit toolchain downloads, copied local module replacements, and preserved dependency notices; see [packaging research](../research/container-deployment.md). Current builds use the [native packaging workflow](local-containers.md). No image was pushed to a registry. The current smoke does not separately test unauthenticated member rejection, interrupted SMTP uploads, active IMAP termination, or persistent object-packing scratch volumes; existing protocol/process tests provide separate evidence for parts of those paths.
 
 ## Storage maintenance rebuild
 

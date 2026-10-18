@@ -155,7 +155,6 @@ fry_main() {
       "$(fry_binary sqlc)" version
       "$(fry_binary buf)" --version
       ;;
-    test-image) fry_fail 'Compiler tool images were removed. Use the explicit test-dependency image targets.' ;;
     *) fry_fail "Unknown action: $action" ;;
   esac
 }

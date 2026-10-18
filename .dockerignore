@@ -1,22 +1,16 @@
-# An allowlist keeps fixtures, credentials, private data, and agent state out.
+# Only fresh, verified native outputs enter the packaging context. Repository
+# sources, local configuration, credentials, and other artifacts stay outside it.
 **
 !Dockerfile
 !.dockerignore
-!go.mod
-!go.sum
-!LICENSE
-!cmd/
-!cmd/**
-!internal/
-!internal/**
-!db/
-!db/**
-!gen/
-!gen/**
-!third_party/
-!third_party/**
-
-# Runtime builds do not need test sources or generated fixtures.
-**/*_test.go
-**/testdata/**
-internal/testutil/**
+!runtime/
+!runtime/linux-amd64/
+!runtime/linux-arm64/
+!runtime/linux-*/bin/
+!runtime/linux-*/bin/fry
+!runtime/linux-*/bin/fry-member
+!runtime/linux-*/bin/fry-migrate
+!runtime/linux-*/bin/fry-admin
+!runtime/linux-*/licenses/
+!runtime/linux-*/licenses/**
+!runtime/linux-*/data/

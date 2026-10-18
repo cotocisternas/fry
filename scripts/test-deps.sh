@@ -7,11 +7,10 @@ repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 native_go_root=$("$repo_root/scripts/toolchain.sh" go env GOROOT)
 export PATH="$native_go_root/bin:$PATH"
 module="$repo_root/tooling/testdeps"
-export FRY_TESTDEPS_DIR="$module" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=readonly
+export GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off GOSUMDB=off
 go_version=$(awk '$1 == "go" { print $2 }' "$module/go.mod")
 [[ $(go env GOVERSION) == "go$go_version" ]] || { echo "Native Go $go_version is required; run scripts/setup.sh." >&2; exit 2; }
 action=${1:-help}
-if [[ "$action" != build ]]; then export GOPROXY=off GOSUMDB=off; fi
 case "$action" in
   test)
     shift
@@ -34,9 +33,9 @@ case "$action" in
 esac
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/fry/testdeps/bin"
 mkdir -p "$cache"
-# The key includes embedded image recipes and sources. Go's build cache handles
+# The key includes the pinned image references and sources. Go's build cache handles
 # compilation; this executable preserves the child's status (go run cannot).
-key=$(cd "$module" && find . -type f \( -name '*.go' -o -name go.mod -o -name go.sum -o -path './images/*' \) -print0 | sort -z | xargs -0 sha256sum | sha256sum)
+key=$(cd "$module" && find . -type f \( -name '*.go' -o -name go.mod -o -name go.sum \) -print0 | sort -z | xargs -0 sha256sum | sha256sum)
 binary="$cache/${key:0:32}"
 if [[ ! -x "$binary" ]]; then
   temporary=$(mktemp "$cache/build.XXXXXX")

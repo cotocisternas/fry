@@ -1,6 +1,13 @@
 # Source-built test image remediation — 2026-10-18
 
-The current PostgreSQL fixture uses authenticated Debian main **and security**
+> Historical evidence: the user subsequently clarified that upstream service
+> images are permitted. The active fixture now uses digest-pinned upstream
+> PostgreSQL and Ryuk images; see the [fixture reference](../../tooling/testdeps/README.md).
+> The scan results below apply only to the recorded source-built image IDs,
+> not to those upstream images.
+
+
+The PostgreSQL fixture tested in this record used authenticated Debian main **and security**
 snapshots, with installed packages upgraded in both image stages. All previous
 Critical matches and all OpenSSL matches are absent from the new scan. Remaining
 findings are retained below. The Kubernetes rehearsal is on a security hold:

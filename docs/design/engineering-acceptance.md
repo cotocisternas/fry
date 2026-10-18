@@ -75,7 +75,7 @@ future production guarantees require their own implementation and evidence.
 ## Proposed developer command contract
 
 The reference workflow uses mise-managed native tools and Make, with exact tool
-versions and locked dependencies. Docker runs locally built test dependencies
+versions and locked dependencies. Docker runs digest-pinned upstream test dependencies with FRY-owned fixtures
 and explicit deployment rehearsals. Local development and CI use the same versions and
 semantics. Proposed targets: `make fmt`, `make lint`, `make generate`,
 `make generate-check`, `make test`, `make test-integration`, `make test-race`,

@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -28,6 +29,7 @@ type daemonProbe struct {
 	missing    bool
 	rejectRyuk bool
 	stallLogs  bool
+	badImage   string
 	mu         sync.Mutex
 	pulls      int
 	logs       int
@@ -35,7 +37,7 @@ type daemonProbe struct {
 	created    []string
 }
 
-func TestRuntimeUsesOnlyBuiltImagesAndNeverPulls(t *testing.T) {
+func TestRuntimeUsesOnlyPinnedImagesAndNeverPulls(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	probe := &daemonProbe{}
@@ -52,7 +54,7 @@ func TestRuntimeUsesOnlyBuiltImagesAndNeverPulls(t *testing.T) {
 		}
 	}
 	if len(probe.containers()) != 2 {
-		t.Fatalf("created %d containers, want PostgreSQL and locally built Ryuk", len(probe.containers()))
+		t.Fatalf("created %d containers, want pinned PostgreSQL and Ryuk", len(probe.containers()))
 	}
 	running.close(t, ctx)
 	if probe.pullCount() != 0 {
@@ -61,7 +63,19 @@ func TestRuntimeUsesOnlyBuiltImagesAndNeverPulls(t *testing.T) {
 }
 
 func TestMissingLocalImageFailsBeforeCreatingOrPulling(t *testing.T) {
-	probe := &daemonProbe{missing: true}
+	assertImageRejected(t, &daemonProbe{missing: true})
+}
+
+func TestWrongRepoDigestFailsBeforeCreatingOrPulling(t *testing.T) {
+	assertImageRejected(t, &daemonProbe{badImage: "digest"})
+}
+
+func TestWrongPlatformFailsBeforeCreatingOrPulling(t *testing.T) {
+	assertImageRejected(t, &daemonProbe{badImage: "platform"})
+}
+
+func assertImageRejected(t *testing.T, probe *daemonProbe) {
+	t.Helper()
 	environment := probe.serve(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
@@ -72,7 +86,7 @@ func TestMissingLocalImageFailsBeforeCreatingOrPulling(t *testing.T) {
 	if !errors.As(err, &exitError) || exitError.ExitCode() != 1 {
 		t.Fatalf("missing-image status: %v\n%s", err, output)
 	}
-	if !strings.Contains(string(output), "run scripts/test-deps.sh build") {
+	if !strings.Contains(string(output), "run scripts/test-deps.sh pull") {
 		t.Fatalf("missing setup instruction: %s", output)
 	}
 	if probe.pullCount() != 0 || len(probe.containers()) != 0 {
@@ -109,7 +123,7 @@ func (p *daemonProbe) serve(t *testing.T) []string {
 			http.Error(w, "test forbids image pulls", http.StatusForbidden)
 			return
 		}
-		if p.missing && strings.Contains(r.URL.Path, "/images/fry-testdeps-postgres:") {
+		if p.missing && strings.Contains(r.URL.Path, "/images/docker.io/library/postgres:") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
 			if _, err := io.WriteString(w, `{"message":"fixture image deliberately unavailable"}`); err != nil {
@@ -130,6 +144,9 @@ func (p *daemonProbe) serve(t *testing.T) []string {
 }
 
 func (p *daemonProbe) captureCreated(response *http.Response) error {
+	if p.badImage != "" && strings.Contains(response.Request.URL.Path, "/images/") {
+		return p.corruptImage(response)
+	}
 	if !strings.HasSuffix(response.Request.URL.Path, "/containers/create") {
 		return nil
 	}
@@ -148,6 +165,27 @@ func (p *daemonProbe) captureCreated(response *http.Response) error {
 		p.created = append(p.created, value.ID)
 		p.mu.Unlock()
 	}
+	return nil
+}
+
+func (p *daemonProbe) corruptImage(response *http.Response) error {
+	var inspected client.ImageInspectResult
+	err := json.NewDecoder(response.Body).Decode(&inspected)
+	if err := errors.Join(err, response.Body.Close()); err != nil {
+		return err
+	}
+	if p.badImage == "digest" {
+		inspected.RepoDigests = []string{"postgres@sha256:" + strings.Repeat("0", 64)}
+	} else {
+		inspected.Os = "wrong-platform"
+	}
+	data, err := json.Marshal(inspected)
+	if err != nil {
+		return err
+	}
+	response.Body = io.NopCloser(bytes.NewReader(data))
+	response.ContentLength = int64(len(data))
+	response.Header.Set("Content-Length", strconv.Itoa(len(data)))
 	return nil
 }
 

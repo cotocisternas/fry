@@ -30,8 +30,11 @@ The small root command surface is:
   `make check` to reproduce the contributor CI gate, or `make build`,
   `make fmt-check lint vet`, `make test-integration` and other focused targets
   from `make help` while developing.
-- [test-deps.sh](test-deps.sh): build, identify, check and run disposable local
-  test dependencies. Prefer `make test-deps-build`, `make test-deps-check`,
+- [container.sh](container.sh): compile FRY natively, verify static Linux outputs
+  and package them in the pinned distroless runtime. Use `make container
+  IMAGE=fry:local-test ARCH=amd64`; no compilation runs inside Docker.
+- [test-deps.sh](test-deps.sh): pull, identify, check and run disposable local
+  test dependencies. Prefer `make test-deps-pull`, `make test-deps-check`,
   `make test-deps-test` and `make test-deps-lint`; direct `image` and
   `run -- COMMAND ARGS` actions are described in the
   [fixture lifecycle reference](../tooling/testdeps/README.md).
@@ -48,22 +51,18 @@ The small root command surface is:
 
 Setup needs the [host prerequisites](../docs/development.md#setup), including
 Linux amd64 or arm64, mise, Bash, Make, Python 3, OpenSSL and a C compiler.
-Integration fixtures require Docker access and locally source-built dependency
-images. Before the first image build, explicitly provision the digest-pinned
-Linux base as shown below. Kubernetes has additional prerequisites in its
-[profile README](../deploy/kubernetes/local/README.md).
+Integration fixtures require Docker access and digest-pinned upstream dependency
+images. FRY owns their Testcontainers setup and lifecycle code. Kubernetes has
+additional prerequisites in its [profile README](../deploy/kubernetes/local/README.md).
 
-Normal tool selection does not install missing tools. Setup and explicit image
-builds may download pinned inputs; the image builder requires its base already
-present. Smoke scenarios require their images to exist
+Normal tool selection does not install missing tools. Setup downloads pinned
+tools and upstream images. Smoke scenarios require their images to exist
 locally; the launcher does not build or pull images. Native process scenarios
 build temporary FRY test executables.
 
 ## Demo and smoke rehearsals
 
 ```bash
-source tooling/testdeps/images/pins.env
-docker pull "$FRY_TESTDEPS_BASE"
 make setup
 make doctor
 make demo
@@ -73,7 +72,7 @@ make smoke SCENARIO=replicas
 make smoke SCENARIO=offline-restore
 
 # Explicit application image build before deployment rehearsals:
-docker build -t fry:local-test .
+make container IMAGE=fry:local-test
 make smoke SCENARIO=containers IMAGE=fry:local-test
 make smoke SCENARIO=kubernetes IMAGE=fry:local-test
 ```

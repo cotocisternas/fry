@@ -2,71 +2,68 @@ package testdeps
 
 import (
 	"context"
-	"crypto/sha256"
-	"embed"
 	"fmt"
-	"io/fs"
 	"runtime"
+	"strings"
 
 	"github.com/moby/moby/client"
 )
 
-//go:embed images/* go.mod
-var recipes embed.FS
-
-const recipeLabel = "io.fry.testdeps.recipe"
-
-// Image identifies a FRY-built image by the complete reviewed recipe and architecture.
-// It performs no Docker operations and never builds or pulls an image.
-func Image(kind string) (tag, digest string, err error) {
-	if kind != "postgres" && kind != "ryuk" {
-		return "", "", fmt.Errorf("unknown dependency image %q", kind)
+// Image returns a reviewed upstream image reference without contacting Docker.
+// The OCI index digest fixes the contents; Docker selects the host architecture.
+func Image(kind string) (string, error) {
+	switch kind {
+	case "postgres":
+		return "docker.io/library/postgres:18.6-trixie@" +
+			"sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336", nil
+	case "ryuk":
+		return "docker.io/testcontainers/ryuk:0.14.0@" +
+			"sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0", nil
+	default:
+		return "", fmt.Errorf("unknown dependency image %q", kind)
 	}
-	sum := sha256.New()
-	err = fs.WalkDir(recipes, ".", func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		data, readErr := recipes.ReadFile(path)
-		if readErr != nil {
-			return readErr
-		}
-		if _, writeErr := fmt.Fprintf(sum, "%s\x00%s\x00", path, data); writeErr != nil {
-			return writeErr
-		}
-		return nil
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("hash image recipe: %w", err)
-	}
-	digest = fmt.Sprintf("%x", sum.Sum(nil))
-	return fmt.Sprintf("fry-testdeps-%s:%s-%s", kind, digest[:24], runtime.GOARCH), digest, nil
 }
 
-// Check verifies that both current recipe images exist locally and have matching
-// provenance labels. A missing or stale image requires an explicit build.
+// Check requires the pinned images locally and resolves immutable runtime IDs.
+// It never pulls images; setup must explicitly run scripts/test-deps.sh pull.
 func Check(ctx context.Context, docker client.APIClient) (map[string]string, error) {
 	images := make(map[string]string)
 	for _, kind := range []string{"postgres", "ryuk"} {
-		tag, digest, err := Image(kind)
+		ref, err := Image(kind)
 		if err != nil {
 			return nil, err
 		}
-		inspected, err := docker.ImageInspect(ctx, tag)
+		inspected, err := docker.ImageInspect(ctx, ref)
 		if err != nil {
-			return nil, fmt.Errorf("local %s image unavailable; run scripts/test-deps.sh build: %w", kind, err)
+			return nil, fmt.Errorf("local %s image unavailable; run scripts/test-deps.sh pull: %w", kind, err)
 		}
-		if inspected.Config == nil || inspected.Config.Labels[recipeLabel] != digest ||
-			inspected.Config.Labels["io.fry.testdeps.kind"] != kind {
-			return nil, fmt.Errorf("local image %s has invalid recipe metadata; run scripts/test-deps.sh build", tag)
+		if !hasRepoDigest(inspected.RepoDigests, ref) {
+			return nil, fmt.Errorf("local image %s has wrong RepoDigests; run scripts/test-deps.sh pull", ref)
 		}
 		if inspected.Os != "linux" || inspected.Architecture != runtime.GOARCH {
-			return nil, fmt.Errorf("local image %s has wrong platform", tag)
+			return nil, fmt.Errorf(
+				"local image %s must be linux/%s; run scripts/test-deps.sh pull",
+				ref,
+				runtime.GOARCH,
+			)
 		}
 		images[kind] = inspected.ID
 	}
 	return images, nil
+}
+
+func hasRepoDigest(actual []string, ref string) bool {
+	repository, digest, _ := strings.Cut(ref, "@")
+	repository, _, _ = strings.Cut(repository, ":")
+	want := normalizeRepoDigest(repository + "@" + digest)
+	for _, candidate := range actual {
+		if normalizeRepoDigest(candidate) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeRepoDigest(ref string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(ref, "docker.io/"), "library/")
 }

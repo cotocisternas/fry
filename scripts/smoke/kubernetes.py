@@ -169,8 +169,7 @@ class Rehearsal(fixture.Rehearsal):
                                              'fsGroup': 999, 'fsGroupChangePolicy': 'OnRootMismatch'},
                          'containers': [{'name': 'postgres', 'image': self.postgres_image, 'imagePullPolicy': 'Never',
                                          'env': [{'name': 'POSTGRES_PASSWORD', 'value': 'fry-test-only'},
-                                                 {'name': 'POSTGRES_DB', 'value': 'fry_test'},
-                                                 {'name': 'PGDATA', 'value': '/var/lib/postgresql/data'}],
+                                                 {'name': 'POSTGRES_DB', 'value': 'fry_test'}],
                                          'resources': {'requests': {'cpu': '250m', 'memory': '256Mi'},
                                                        'limits': {'cpu': '1', 'memory': '1Gi'}},
                                          'readinessProbe': {'exec': {'command': ['pg_isready', '-h', '127.0.0.1', '-U', 'postgres', '-d', 'fry_test']},
@@ -261,10 +260,7 @@ class Rehearsal(fixture.Rehearsal):
         self.postgres_source = fixture.testdeps.image()
         source = json.loads(execute('docker', 'image', 'inspect', '--platform=linux/amd64', self.postgres_source).stdout)[0]
         assert source['Architecture'] == 'amd64' and source['Os'] == 'linux'
-        assert source['Id'].startswith('sha256:'), 'local PostgreSQL source must have a content identity'
-        labels = source['Config'].get('Labels', {})
-        assert labels.get('io.fry.testdeps.kind') == 'postgres' and labels.get('io.fry.testdeps.recipe'), \
-            'PostgreSQL source lacks repository build provenance'
+        assert re.fullmatch(r'sha256:[0-9a-f]{64}', source['Id']), 'PostgreSQL source must have a content identity'
         assert execute('docker', 'image', 'inspect', self.postgres_image, check=False).returncode, \
             'generated PostgreSQL alias already exists'
         self.postgres_tag_created = True

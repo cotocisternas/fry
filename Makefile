@@ -1,8 +1,11 @@
 .DEFAULT_GOAL := help
-export SCENARIO IMAGE
-.PHONY: demo smoke
+export SCENARIO IMAGE ARCH
+.PHONY: demo smoke container
 demo:
 	./scripts/toolchain.sh exec python3 -m scripts.dev.demo_admin
+
+container:
+	./scripts/container.sh "$$IMAGE" "$$ARCH"
 
 smoke:
 	@if [ -n "$$IMAGE" ]; then \
@@ -11,9 +14,9 @@ smoke:
 	  ./scripts/smoke.sh "$${SCENARIO:-help}"; \
 	fi
 
-.PHONY: setup setup-tools doctor test-deps-build test-deps-check test-deps-lint test-deps-test native-tools-check test-script-processes test-scripts lint-policy-check
+.PHONY: setup setup-tools doctor test-deps-pull test-deps-check test-deps-lint test-deps-test native-tools-check test-script-processes test-scripts lint-policy-check
 setup: setup-tools
-	./scripts/test-deps.sh build
+	./scripts/test-deps.sh pull
 
 setup-tools:
 	./scripts/setup.sh
@@ -21,8 +24,8 @@ setup-tools:
 doctor:
 	./scripts/doctor.sh
 
-test-deps-build:
-	./scripts/test-deps.sh build
+test-deps-pull:
+	./scripts/test-deps.sh pull
 
 test-deps-check:
 	./scripts/test-deps.sh check
@@ -67,7 +70,7 @@ browser-setup:
 security-setup:
 	./scripts/security/setup.sh
 
-.PHONY: help fmt fmt-check lint lint-config build vet generate generate-check sqlc sqlc-check sqlc-vet test test-integration test-race test-forks coverage coverage-report test-image toolchain-versions test-browser security proto-check proto-drift-check check release-check
+.PHONY: help fmt fmt-check lint lint-config build vet generate generate-check sqlc sqlc-check sqlc-vet test test-integration test-race test-forks coverage coverage-report toolchain-versions test-browser security proto-check proto-drift-check check release-check
 
 help fmt fmt-check lint lint-config build vet generate generate-check sqlc sqlc-check sqlc-vet test-browser security proto-check proto-drift-check check release-check:
 	./scripts/quality.sh $@
@@ -77,6 +80,3 @@ test test-integration test-race test-forks coverage coverage-report:
 
 toolchain-versions:
 	./scripts/toolchain.sh versions
-
-test-image:
-	./scripts/test-deps.sh build

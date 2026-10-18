@@ -106,7 +106,7 @@ FRY_TEST_RUN='Migration|Import' FRY_TEST_PACKAGES='./internal/receiptstore ./int
   ./scripts/tests/receipts.sh -race -short
 ```
 
-The runner creates a disposable PostgreSQL fixture from the locally built images.
+The runner creates a disposable PostgreSQL fixture from the pinned upstream images available locally.
 A skipped PostgreSQL test in `make test` is incomplete verification. Filtered runs
 are partial evidence; record the packages, test selection and flags. `-short`
 omits expensive large-message cases, so include the relevant large-message tests
@@ -124,7 +124,7 @@ Choose additional checks by the files and contracts involved:
 - Mail-library patches: use `make test-forks TEST_FLAGS=-race`. The nested modules
   are outside root `./...`; transport changes should include their relevant suites.
 - Dependency-fixture changes: use `make test-deps-lint` and `make test-deps-test`,
-  rebuilding images with `make test-deps-build` when recipes change. Use
+  pulling images with `make test-deps-pull` when pins change. Use
   `make test-scripts` for Docker-free script regressions;
   `make test-script-processes` selects the process timeout and cleanup subset.
 - Cross-module durable or concurrency changes: consider `make test-integration`
@@ -134,7 +134,7 @@ Choose additional checks by the files and contracts involved:
 - Documentation-only changes: verify local links and command claims. Go lint and
   runtime tests do not validate prose.
 
-CI runs `make check` after explicit native setup and local dependency-image builds.
+CI runs `make check` after explicit native setup and explicit dependency-image pulls.
 Use it locally to reproduce the contributor gate; focused commands above provide
 faster, partial evidence while developing. It includes the existing-code baseline,
 browser, security and protobuf checks. See

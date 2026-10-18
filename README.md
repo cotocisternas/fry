@@ -24,22 +24,18 @@ Run in Bash:
 ```bash
 git clone https://github.com/cotocisternas/fry.git
 cd fry
-make setup-tools
-source tooling/testdeps/images/pins.env
-docker pull "$FRY_TESTDEPS_BASE"
-make test-deps-build
+make setup
 make doctor
 make build
 make demo
 ```
 
-The explicit pull provisions the exact digest-pinned Linux base permitted by
-the repository recipe. PostgreSQL and the Testcontainers Ryuk cleanup helper are
-then built locally from pinned sources. `make setup` combines `setup-tools` and
-`test-deps-build` after that base is present. Setup/build steps download verified
-inputs; integration runs require the resulting local images and fail if they are
-missing. Go builds, lint and generation run on the host; Docker supplies disposable
-dependencies. Mise shell activation is optional.
+Setup installs the pinned native tools and pulls digest-pinned upstream PostgreSQL
+and Testcontainers Ryuk images. FRY owns the fixture setup, readiness and cleanup
+code; the service binaries come from upstream images. Integration runs require
+those images locally and fail if they are missing. Go builds, lint and generation
+run on the host; Docker supplies disposable dependencies. Mise shell activation
+is optional.
 
 The demo starts a localhost installation with synthetic mail and prints its URL
 and fixture credentials. Ctrl-C removes its processes and data. For a manually

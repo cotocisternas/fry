@@ -221,7 +221,7 @@ conversion is available.
 
 ## Deployment and restore rehearsals
 
-Build the local container image with `docker build -t fry:local-test .`, then run
+Build the local container image with `make container IMAGE=fry:local-test`, then run
 `./scripts/smoke.sh containers` for a disposable TLS mail/restart rehearsal. [Container
 runtime evidence](validation/container-runtime.md) covers nonroot operation, read-only
 roots, retained member volumes and conservative crash fencing. This does not provision
@@ -270,8 +270,8 @@ optional OpenTelemetry traces and metrics. Run `make sqlc-check sqlc-vet` to val
 generated queries, and `make sqlc` after editing SQL.
 
 The lightweight `make test` may skip PostgreSQL cases. Required integration runs use
-Testcontainers-Go and FRY's locally built PostgreSQL/cleanup images; missing images fail
-instead of pulling prebuilt services. See the
+FRY-owned Testcontainers-Go fixtures and digest-pinned upstream PostgreSQL/cleanup
+images; missing local images fail with instructions to run the explicit pull target. See the
 [contribution guide](../CONTRIBUTING.md#choose-checks-for-the-change) for focused commands.
 
 The runner binds PostgreSQL to a random loopback port and removes its container/storage

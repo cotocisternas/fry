@@ -183,7 +183,6 @@ class Rehearsal:
     def setup(self):
         docker('image', 'inspect', self.image)
         self.postgres_source = testdeps.image()
-        docker('image', 'inspect', self.postgres_source)
         self.configure()
         self.created_networks.append(self.network)
         docker('network', 'create', '--internal', '--label', self.label, self.network)
@@ -331,17 +330,21 @@ class Rehearsal:
             time.sleep(.1)
         assert self.sql("SELECT count(*) FROM fry_member_owner WHERE member='"
                         + f'{1:032x}' + "' AND epoch=2 AND NOT closed") == '1'
+        owners_query = ('SELECT member,epoch,instance,closed FROM fry_member_owner '
+                        'ORDER BY member,epoch')
+        owners_before = self.sql(owners_query)
         previous_logs = self.all_logs(self.members[0])
-        # Restart the exact same container and volume. Never clear owner flags,
-        # replace roots, or otherwise manufacture a safe takeover.
+        # This same container, configuration and volume already served mail.
+        # Never clear owner flags, replace roots, or manufacture a safe takeover.
         docker('start', self.members[0])
         code = self.wait_exit(self.members[0], 15)
         assert code != 0, 'unclean generation was silently adopted'
         restart_logs = self.all_logs(self.members[0])
         assert restart_logs.startswith(previous_logs), 'restart log prefix unexpectedly changed'
         restart_logs = restart_logs[len(previous_logs):]
-        assert 'receiptstore: attempt has an active lease or member operation' in restart_logs, restart_logs
         assert 'listening with mutual TLS' not in restart_logs, restart_logs
+        # Command errors are sanitized; prove refusal through unchanged owners.
+        assert self.sql(owners_query) == owners_before, 'refused restart changed member owner rows'
         assert self.sql('SELECT count(*) FROM fry_member_owner WHERE epoch=2 AND NOT closed') == '2'
         assert self.sql('SELECT max(epoch) FROM fry_member_owner') == '2'
         self.stop(self.coordinator)
