@@ -155,7 +155,7 @@ Choose additional checks by the files and contracts involved:
   runtime tests do not validate prose.
 
 CI runs `make check` after explicit native setup and explicit dependency-image pulls.
-Use it locally to reproduce the contributor gate; focused commands above provide
+Use it locally to reproduce the CI validation suite; focused commands above provide
 faster, partial evidence while developing. It includes the existing-code baseline,
 browser, security and protobuf checks. See
 [CI and local verification](docs/development.md#ci-and-local-verification) for

@@ -128,8 +128,8 @@ case "$action" in
     echo 'make coverage coverage-report'
     echo 'make container IMAGE=fry:local-test ARCH=amd64 (native binaries, distroless packaging)'
     echo 'Native mise tools; Docker runs dependencies and deployment rehearsals. TEST_FLAGS=-short for short suites.'
-    echo 'make browser-setup security-setup (explicit downloads for contributor checks)'
-    echo 'make check (complete contributor gate); make release-check remains unavailable.'
+    echo 'make browser-setup security-setup (explicit downloads for CI validation)'
+    echo 'make check (complete CI validation suite); make release-check remains unavailable.'
     ;;
   *) echo "Unknown quality action: $action" >&2; exit 2 ;;
 esac

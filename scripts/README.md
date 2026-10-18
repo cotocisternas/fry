@@ -27,7 +27,7 @@ The small root command surface is:
   `lint`, `sqlc`, `buf`, `exec`, `receipts` and `versions`. Use Make for ordinary
   work; use this adapter for a focused native command.
 - [quality.sh](quality.sh): implement the root Make quality targets. Use
-  `make check` to reproduce the contributor CI gate, or `make build`,
+  `make check` to reproduce the CI validation suite, or `make build`,
   `make fmt-check lint vet`, `make test-integration` and other focused targets
   from `make help` while developing.
 - [container.sh](container.sh): compile FRY natively, verify static Linux outputs
@@ -187,7 +187,7 @@ resources and is not part of setup, smoke or normal quality targets.
 `make test` may skip PostgreSQL cases; required integration targets need Docker
 and prepared local images. The existing-code baseline uses the short root race
 suite and complete fork race suites. `make check` adds the browser, security and
-protobuf compatibility checks used by contributor CI. See
+protobuf compatibility checks used by CI. See
 [CI and local verification](../docs/development.md#ci-and-local-verification)
 for the setup sequence and evidence limits. `make release-check` continues to
 report incomplete release requirements.

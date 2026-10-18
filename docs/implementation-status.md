@@ -289,7 +289,7 @@ references to distinguish implemented behavior from broader API designs.
 and rehearsals rerun in the tooling phase. The
 [Go quality policy](research/go-quality-policy.md) and
 [lint gap audit](research/lint-gap-audit.md) explain analyzer selection and gaps.
-These local records precede the contributor gate described above. Release
+These local records precede the CI validation suite described above. Release
 qualification and production validation remain separate requirements.
 
 ## Run a local mail process

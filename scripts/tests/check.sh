@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# The same contributor gate locally and in CI; never silently narrow selection.
+# The same CI validation suite locally and in CI; never silently narrow selection.
 set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
 cd "$repo_root"
-evidence=.artifacts/contributor-checks
+evidence=.artifacts/ci-validation
 mkdir -p "$evidence"
 rm -f "$evidence/PASSED"
 [[ $# == 0 ]] || { echo 'check accepts no test-selection arguments.' >&2; exit 2; }
@@ -33,5 +33,5 @@ FRY_COVERAGE_DIR="$evidence" ./scripts/quality.sh coverage -short
 ./scripts/quality.sh security
 snapshot > "$evidence/source.after.sha256"
 cmp "$evidence/source.before.sha256" "$evidence/source.after.sha256"
-printf '%s\n' 'Contributor checks passed (Linux native, root race/short with PostgreSQL, full fork race suites, browser, security, API compatibility and generated drift).' > "$evidence/PASSED"
+printf '%s\n' 'Lint, build, tests and security checks passed (Linux native, root race/short with PostgreSQL, full fork race suites, browser, security, API compatibility and generated drift).' > "$evidence/PASSED"
 cat "$evidence/PASSED"

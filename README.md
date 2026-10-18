@@ -73,7 +73,7 @@ behavior you change. Use `make help` to discover commands and the
 changes need the disposable integration runner. A clean lint result or a coverage
 percentage does not establish correctness.
 
-`make check` runs the contributor CI gate, including the existing-code baseline,
+`make check` runs the CI validation suite, including the existing-code baseline,
 browser regressions, security checks and protobuf compatibility. See
 [CI and local verification](docs/development.md#ci-and-local-verification) for
 prerequisites and the distinction between that gate and release validation.
@@ -92,7 +92,7 @@ representative retained-data capacity and the 30-minute migration cutover target
 still need validation. No conversion of older prototype databases is supplied.
 
 `make release-check` remains unavailable while release and native arm64 execution
-evidence are incomplete. A successful contributor check does not establish the
+evidence are incomplete. A successful CI validation run does not establish the
 production and recovery guarantees above.
 
 [Implementation status and evidence](docs/implementation-status.md) groups the

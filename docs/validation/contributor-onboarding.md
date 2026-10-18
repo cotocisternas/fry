@@ -84,7 +84,7 @@ are not committed or durable CI artifacts.
 The final onboarding instructions are in the [development guide](../development.md#setup).
 They now pull digest-pinned upstream PostgreSQL/Ryuk images. The image-build
 policy used by this earlier validation was superseded by the user’s clarification;
-the historical commands and results above are retained as executed. The contributor gate adds
+the historical commands and results above are retained as executed. The CI validation suite adds
 `make security-setup`, `make browser-setup` and `make check`; hosted Ubuntu 24.04
 uses `make browser-setup BROWSER_SETUP_FLAGS=--with-deps` to install its Linux
 libraries explicitly. The integrated gate and GitHub Actions execution need

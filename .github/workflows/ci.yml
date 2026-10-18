@@ -1,4 +1,4 @@
-name: CI
+name: Build & test
 
 on:
   pull_request:
@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  contributor-checks:
-    name: Contributor checks (Linux amd64)
+  validate:
+    name: Linux amd64
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -24,29 +24,29 @@ jobs:
       PYTHONDONTWRITEBYTECODE: '1'
       FRY_PROTO_BASE_REF: ${{ github.event.pull_request.base.sha || '' }}
     steps:
-      - name: Check out source and API comparison history
+      - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install pinned mise
+      - name: Setup mise
         uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
           version: '2026.10.13'
           sha256: '94c45523c7b6760b7da704f16051171ca32e8447a849a02266a439a4455e9a12'
           install: false
           cache: false
-      - name: Prepare native tools
+      - name: Setup tools
         run: make setup-tools doctor
-      - name: Pull pinned upstream test dependency images
+      - name: Pull test images
         run: make test-deps-pull
-      - name: Prepare security scanners
+      - name: Setup scanners
         run: make security-setup
-      - name: Prepare Chromium
+      - name: Setup browser
         run: make browser-setup BROWSER_SETUP_FLAGS=--with-deps
-      - name: Run contributor checks
+      - name: Validate
         run: make check
-      - name: Package native binaries in the runtime image
+      - name: Package container
         run: |
           runtime=$(awk '$1 == "FROM" {print $2}' Dockerfile)
           docker pull --platform linux/amd64 "$runtime"

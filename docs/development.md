@@ -11,7 +11,7 @@ ownership and choosing tests. A tool result supports review; it does not decide
 whether a module is clear or an abstraction is useful.
 The [script guide](../scripts/README.md) describes the small set of root launchers,
 scenario names, module invocations and script directory responsibilities.
-The contributor CI gate is `make check`; release qualification remains separate.
+The CI validation suite is `make check`; release qualification remains separate.
 Execution evidence and limits are recorded in
 [native tooling validation](validation/native-tooling.md) and the
 [clean-clone onboarding record](validation/contributor-onboarding.md).
@@ -93,7 +93,7 @@ make test-scripts              # Docker-free Python script regressions
 make test                      # lightweight run; PostgreSQL cases may skip
 make test-race TEST_FLAGS=-short
 make baseline-check            # complete existing-code baseline, not full release gate
-make check                     # contributor CI gate after all prerequisites are prepared
+make check                     # CI validation suite after all prerequisites are prepared
 ```
 
 `fmt` and `fmt-check` protect upstream fork sources from stylistic rewrites.
@@ -237,7 +237,7 @@ the policy rejects a removed RPC and accepts an additive message.
 
 ## CI and local verification
 
-The [GitHub Actions contributor workflow](../.github/workflows/ci.yml) runs on
+The [GitHub Actions Build & test workflow](../.github/workflows/ci.yml) runs on
 pull requests, pushes to `main` and manual dispatch, on Ubuntu 24.04 Linux amd64
 with pinned checkout and mise setup. After the native tools and pinned upstream
 images above are prepared, run:
@@ -258,7 +258,7 @@ Linux libraries too. On other distributions, prepare equivalent libraries with
 the distribution's package manager. Missing browser prerequisites fail the gate.
 
 The runner explicitly pulls the pinned PostgreSQL and Ryuk images. No service
-credentials or production database are needed. After the contributor gate, CI
+credentials or production database are needed. After the CI validation suite, CI
 explicitly pulls the pinned distroless runtime, runs `make container` for amd64
 and checks the resulting executable with `-help`; it does not publish the image.
 
@@ -273,8 +273,8 @@ against an owned disposable demo. `make security` uses the prepared scanners;
 lint alone is not its substitute. Ordinary browser/security checks do not install
 missing scanner or browser binaries. Security checks may fetch current advisory
 data, so they require network access even after scanner setup.
-Successful contributor-gate evidence is written under
-`.artifacts/contributor-checks/`, including source hashes, coverage output and
+Successful CI validation evidence is written under
+`.artifacts/ci-validation/`, including source hashes, coverage output and
 the final `PASSED` marker; failures remove the old success marker.
 Select individual targets for focused local work and identify their limits.
 
