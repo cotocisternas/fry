@@ -267,11 +267,11 @@ func TestSMTPSizeBoundaries(t *testing.T) {
 			f.start(t)
 			err := send(t, f.client(t), []string{"billing@example.test"}, body)
 			if len(body) <= 5 {
-				requireTestCondition(t, (err == nil && f.original(t) == body), "legal boundary rejected", err)
+				requireTestCondition(t, err == nil && f.original(t) == body, "legal boundary rejected", err)
 			} else {
 				requireTestCondition(
 					t,
-					(err != nil && f.count(t, "fry_receipt") == 0),
+					err != nil && f.count(t, "fry_receipt") == 0,
 					"oversized original accepted",
 					err,
 				)
