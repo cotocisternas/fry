@@ -87,8 +87,7 @@ func memberStorageSingleConnectionFixture(t *testing.T, tracer *memberStorageQue
 	check(t, err)
 	service, err := New(db, mail, time.Hour)
 	check(t, err)
-	_, err = service.Bootstrap(ctx, "operator", "test-operator-secret", true)
-	check(t, err)
+	seedFixtureOperator(t, service)
 	root, err := service.Login(ctx, "operator", "test-operator-secret")
 	check(t, err)
 	f := &fixture{service, db, mail, root, newID(t), newID(t), newID(t)}

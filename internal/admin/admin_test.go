@@ -45,6 +45,14 @@ func check(t *testing.T, err error) {
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
+	f := setupUninitialized(t)
+	seedFixtureOperator(t, f.service)
+	f.initialize(t)
+	return f
+}
+
+func setupUninitialized(t *testing.T) *fixture {
+	t.Helper()
 	ctx := context.Background()
 	db := setupDatabase(t, ctx)
 	check(t, receiptstore.Migrate(ctx, db))
@@ -78,25 +86,29 @@ func setup(t *testing.T) *fixture {
 	check(t, err)
 	svc, err := New(db, mail, time.Hour)
 	check(t, err)
-	created, err := svc.Bootstrap(ctx, "operator", "test-operator-secret", true)
+	return &fixture{svc, db, mail, Session{}, newID(t), newID(t), newID(t)}
+}
+
+func (f *fixture) initialize(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	root, err := f.service.Login(ctx, "operator", "test-operator-secret")
 	check(t, err)
-	if !created {
-		t.Fatal("bootstrap did not create operator")
-	}
-	root, err := svc.Login(ctx, "operator", "test-operator-secret")
-	check(t, err)
-	f := &fixture{svc, db, mail, root, newID(t), newID(t), newID(t)}
-	check(t, svc.PutOrganization(ctx, root.Token, Organization{f.org, "Assigned organization"}))
-	check(t, svc.PutOrganization(ctx, root.Token, Organization{f.other, "Other organization"}))
-	check(t, svc.CreateInbox(ctx, root.Token, Inbox{ID: f.inbox, Organization: f.org}))
-	return f
+	f.root = root
+	check(t, f.service.PutOrganization(ctx, root.Token, Organization{f.org, "Assigned organization"}))
+	check(t, f.service.PutOrganization(ctx, root.Token, Organization{f.other, "Other organization"}))
+	check(t, f.service.CreateInbox(ctx, root.Token, Inbox{ID: f.inbox, Organization: f.org}))
 }
 
 func (f *fixture) manager(t *testing.T, content bool) Session {
 	t.Helper()
+	id := seedFixtureManager(t, f)
+	return f.managerSession(t, id, content)
+}
+
+func (f *fixture) managerSession(t *testing.T, id string, content bool) Session {
+	t.Helper()
 	ctx := context.Background()
-	id, err := f.service.PutUser(ctx, f.root.Token, "manager", "test-manager-secret", true)
-	check(t, err)
 	check(t, f.service.ReplaceGrants(ctx, f.root.Token, id, []Grant{{Scope: f.org, Content: content}}))
 	session, err := f.service.Login(ctx, "manager", "test-manager-secret")
 	check(t, err)
@@ -104,9 +116,8 @@ func (f *fixture) manager(t *testing.T, content bool) Session {
 }
 
 func TestPersistentAccountsIsolationAndImmediateRevocation(t *testing.T) {
-	f := setup(t)
+	f, manager := setupLocalAccounts(t)
 	ctx := context.Background()
-	manager := f.manager(t, false)
 	orgs, err := f.service.Organizations(ctx, manager.Token)
 	check(t, err)
 	if len(orgs) != 1 || orgs[0].ID != f.org {
