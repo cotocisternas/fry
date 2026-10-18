@@ -134,10 +134,22 @@ func (o *memberOwner) registerReadPin(
 		}); err != nil {
 		return memberReadSource{}, 0, err
 	}
-	if err = commit(work, tx); err != nil {
+	if err = commitReadRegistration(work, tx); err != nil {
 		return memberReadSource{}, 0, err
 	} // Unknown pin registration remains debt.
 	return source, remaining, nil
+}
+
+// Cancellation can refuse a registration only before COMMIT is sent. Once sent,
+// cancelling the wait would turn a visible pin into unknown debt although no
+// storage call began, so the outcome is awaited and closure can still be proven.
+func commitReadRegistration(work context.Context, tx pgx.Tx) error {
+	if err := work.Err(); err != nil {
+		return err
+	}
+	settle, cancel := context.WithTimeout(context.WithoutCancel(work), 5*time.Second)
+	defer cancel()
+	return commit(settle, tx)
 }
 
 func parentReadLease(ctx context.Context, tx pgx.Tx, parentPin, receipt ID) (float64, error) {

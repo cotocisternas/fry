@@ -503,19 +503,113 @@ func TestMemberGRPCPrematureSuccessClosesBlockedOriginal(t *testing.T) {
 
 func TestMemberGRPCOwnerCancellationInterruptsFlowControlledRead(t *testing.T) {
 	f := setup(t)
-	members, servers := remoteFixture(t, f)
+	writes := &memberReadWrites{blocked: make(chan struct{}), result: make(chan error, 1)}
+	members, servers := remoteFixture(t, f, writes.wrap)
+	operation := newID(t)
+	stream, req := unreceivedMemberRead(t, f, members, operation)
+	requireReceiptNoError(t, stream.SendMsg(req))
+	requireReceiptNoError(t, stream.CloseSend())
+	// Do not receive: the storage reader must be inside a payload send that the
+	// client's flow-control window cannot admit when ownership ends.
+	select {
+	case <-writes.blocked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("member read never reached a flow-control-blocked payload write")
+	}
+	requireReceiptCondition(
+		t,
+		scalar(t, f.pool, `SELECT count(*) FROM fry_member_read WHERE id=$1 AND NOT closed`, operation.String()) == 1,
+		"blocked member read was not open",
+	)
+	select {
+	case err := <-writes.result:
+		t.Fatal("payload write beyond the receive window returned before cancellation", err)
+	default:
+	}
+	servers[0].owner.cancel()
+	deadline := time.Now().Add(5 * time.Second)
+	// Still receive nothing: a client read would open the window and could let
+	// the blocked write complete instead of proving its interruption.
+	select {
+	case err := <-writes.result:
+		requireReceiptCondition(t, err != nil, "blocked payload write completed after cancellation")
+	case <-time.After(time.Until(deadline)):
+		t.Fatal("blocked payload write did not return after cancellation")
+	}
+	requireInterruptedMemberRead(t, stream, deadline)
+	requireClosedMemberRead(t, f, operation, deadline)
+}
+
+// memberReadWrites observes only the Read marked by unreceivedMemberRead. Go's
+// HTTP/2 server returns a write larger than its small handler buffer only after
+// framing it, so a 64 KiB chunk crossing the client's 65535-byte stream window
+// stays blocked until the client receives. The test checks it has not returned.
+type memberReadWrites struct {
+	blocked chan struct{}
+	result  chan error
+}
+
+func (o *memberReadWrites) wrap(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Fry-Test-Observe") != "" {
+			w = &memberReadResponse{ResponseWriter: w, observer: o}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+type memberReadResponse struct {
+	http.ResponseWriter
+	observer *memberReadWrites
+	written  int64
+	entered  bool
+}
+
+func (w *memberReadResponse) Write(p []byte) (int, error) {
+	beyondWindow := !w.entered && w.written+int64(len(p)) > 65535
+	if beyondWindow {
+		w.entered = true
+		close(w.observer.blocked)
+	}
+	n, err := w.ResponseWriter.Write(p)
+	w.written += int64(n)
+	if beyondWindow {
+		w.observer.result <- err
+	}
+	return n, err
+}
+
+func (w *memberReadResponse) Flush() {
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// Unwrap lets the member's ResponseController reach the HTTP/2 write deadline.
+func (w *memberReadResponse) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// unreceivedMemberRead prepares a parent-pinned member Read whose client never
+// receives. Member frames are compressed, so the 1 MiB original is entropy:
+// compressible bytes could complete within the 64 KiB HTTP/2 receive windows.
+func unreceivedMemberRead(
+	t *testing.T,
+	f *fixture,
+	members [2]*RemoteMember,
+	operation ID,
+) (grpc.ClientStream, *memberv1.ReadRequest) {
+	t.Helper()
 	store, err := NewWithMembers(t.Context(), f.pool, [2]Member{members[0], members[1]}, f.s.db.opts)
 	requireReceiptNoError(t, err)
 	receipt, err := store.Accept(
 		t.Context(),
 		newID(t),
 		f.envelope(t),
-		io.NopCloser(&replicaPattern{remaining: 1 << 20}),
+		io.NopCloser(&memberEntropySource{remaining: 1 << 20}),
 	)
 	requireReceiptNoError(t, err)
 	parent, err := store.Open(t.Context(), f.org, receipt.ID, 0, receipt.Size)
 	requireReceiptNoError(t, err)
-	defer func() { requireReceiptNoError(t, parent.Close()) }()
+	t.Cleanup(func() { requireReceiptNoError(t, parent.Close()) })
 	var parentID string
 	requireReceiptNoError(
 		t,
@@ -533,48 +627,83 @@ func TestMemberGRPCOwnerCancellationInterruptsFlowControlledRead(t *testing.T) {
 		grpc.WithInitialConnWindowSize(65535),
 	)
 	requireReceiptNoError(t, err)
-	defer func() { requireReceiptNoError(t, conn.Close()) }()
-	ctx, cancel := context.WithCancel(metadata.AppendToOutgoingContext(t.Context(), "fry-release", memberRelease()))
-	defer cancel()
+	t.Cleanup(func() { requireReceiptNoError(t, conn.Close()) })
+	outgoing := metadata.AppendToOutgoingContext(
+		t.Context(),
+		"fry-release", memberRelease(),
+		"fry-test-observe", "read",
+	)
+	ctx, cancel := context.WithCancel(outgoing)
+	t.Cleanup(cancel)
 	stream, err := conn.NewStream(ctx, &grpc.StreamDesc{ServerStreams: true}, memberconnect.MemberServiceReadProcedure)
 	requireReceiptNoError(t, err)
-	operation := newID(t)
-	req := &memberv1.ReadRequest{
+	return stream, &memberv1.ReadRequest{
 		Target:    members[0].target(claim{Organization: f.org, Receipt: receipt.ID}),
 		Operation: operation.String(),
 		ParentPin: parentID,
 		Length:    receipt.Size,
 	}
-	requireReceiptNoError(t, stream.SendMsg(req))
-	requireReceiptNoError(t, stream.CloseSend())
-	// Do not receive. The payload exceeds the HTTP/2 receive window, leaving an
-	// actual storage reader blocked on network flow control until ownership ends.
-	waitMemberReadState(t, f, operation, false)
-	servers[0].owner.cancel()
-	waitMemberReadState(t, f, operation, true)
+}
+
+// Interrupting a blocked response sets a past HTTP/2 write deadline, which
+// resets the stream with INTERNAL_ERROR; a closed stream carries no trailer.
+func requireInterruptedMemberRead(t *testing.T, stream grpc.ClientStream, deadline time.Time) {
+	t.Helper()
+	ended := make(chan error, 1)
+	go func() {
+		for {
+			if err := stream.RecvMsg(&memberv1.ReadResponse{}); err != nil {
+				ended <- err
+				return
+			}
+		}
+	}()
+	select {
+	case err := <-ended:
+		requireReceiptCondition(t, grpcstatus.Code(err) == codes.Internal, "member read was not reset", err)
+	case <-time.After(time.Until(deadline)):
+		t.Fatal("owner cancellation did not interrupt the member read stream")
+	}
+}
+
+// The closure and pin release share the caller's post-cancellation deadline.
+func requireClosedMemberRead(t *testing.T, f *fixture, operation ID, deadline time.Time) {
+	t.Helper()
+	waitMemberReadStateBy(t, f, operation, true, deadline)
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
+	defer cancel()
 	requireReceiptCondition(
 		t,
-		scalar(t, f.pool, `SELECT count(*) FROM fry_read_pin WHERE id=$1`, operation.String()) == 0,
+		scalarContext(ctx, t, f.pool, `SELECT count(*) FROM fry_read_pin WHERE id=$1`, operation.String()) == 0,
 		"cancelled member read retained a pin",
 	)
 }
 
 func waitMemberReadState(t *testing.T, f *fixture, operation ID, closed bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	waitMemberReadStateBy(t, f, operation, closed, time.Now().Add(5*time.Second))
+}
+
+func waitMemberReadStateBy(t *testing.T, f *fixture, operation ID, closed bool, deadline time.Time) {
+	t.Helper()
+	ctx, cancel := context.WithDeadline(t.Context(), deadline)
+	defer cancel()
 	for {
-		if scalar(
-			t,
-			f.pool,
+		var count int64
+		err := f.pool.QueryRow(
+			ctx,
 			`SELECT count(*) FROM fry_member_read WHERE id=$1 AND closed=$2`,
 			operation.String(),
 			closed,
-		) == 1 {
+		).
+			Scan(&count)
+		if err == nil && count == 1 {
 			return
 		}
-		if time.Now().After(deadline) {
+		if ctx.Err() != nil {
 			t.Fatal("member read closure state did not change", closed)
 		}
+		requireReceiptNoError(t, err)
 		time.Sleep(time.Millisecond)
 	}
 }
