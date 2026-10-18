@@ -22,6 +22,7 @@ jobs:
       # Keep source compilation and concurrent Go tests within the hosted runner.
       GOMAXPROCS: '2'
       PYTHONDONTWRITEBYTECODE: '1'
+      FRY_TEST_STREAM: '1'
       FRY_PROTO_BASE_REF: ${{ github.event.pull_request.base.sha || '' }}
       # Keep cached inputs separate from test evidence and runner-preinstalled tools.
       GOCACHE: ${{ github.workspace }}/.artifacts/cache/go-build

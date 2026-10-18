@@ -289,6 +289,12 @@ It includes strict formatting/lint, command builds,
 root and fork vet, generation reproducibility, SQL checks, fixture lifecycle
 tests, process regressions, root PostgreSQL race/coverage tests with `-short`,
 reviewed coverage floors and both complete patched mail-library race suites.
+CI sets `FRY_TEST_STREAM=1` to render Go's root-test JSON events as live,
+package-labelled output. Use `FRY_TEST_STREAM=1 make check` locally for the same
+progress and immediate failure diagnostics. The renderer preserves build errors,
+panic stacks and the test process's failing exit status. The coverage suite's
+five-minute timeout applies to each entire package, not each individual test;
+explicit operation deadlines inside tests remain separate.
 `make test-browser` runs both administration and member-storage Chromium suites
 against an owned disposable demo. `make security` uses the prepared scanners;
 lint alone is not its substitute. Ordinary browser/security checks do not install

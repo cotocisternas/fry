@@ -25,4 +25,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 export TMPDIR="$scratch"
 docker exec "$FRY_TEST_POSTGRES_CONTAINER" postgres --version
-"${go_command[@]}" test -count=1 "-timeout=$test_timeout" "${test_flags[@]}" "$@" "${test_packages[@]}"
+if [[ ${FRY_TEST_STREAM:-0} == 1 ]]; then
+  # -json streams events while package-list mode otherwise buffers test output.
+  # pipefail preserves the Go test exit status even when rendering succeeds.
+  "${go_command[@]}" test -json -count=1 "-timeout=$test_timeout" "${test_flags[@]}" "$@" "${test_packages[@]}" |
+    python3 -m scripts.lib.go_test_output
+else
+  "${go_command[@]}" test -count=1 "-timeout=$test_timeout" "${test_flags[@]}" "$@" "${test_packages[@]}"
+fi
