@@ -270,6 +270,9 @@ Go and the linter check the inputs of each reused entry. Dependency fallback
 caches remain subject to locked installs and checksum verification. Chromium
 uses an exact Playwright lockfile key. Prepared dependency and browser downloads
 are saved before validation, so a later test failure does not discard them.
+Compilation caches are saved after validation and packaging, including failed
+runs; canceled runs skip the save. This retains compiled work without treating
+the failed run as a passing test result.
 
 Setup and `doctor` still run on cache hits, as do all tests, race/coverage checks,
 generation checks and live security scans. Go tests use `-count=1`; cached test
@@ -290,9 +293,12 @@ root and fork vet, generation reproducibility, SQL checks, fixture lifecycle
 tests, process regressions, root PostgreSQL race/coverage tests with `-short`,
 reviewed coverage floors and both complete patched mail-library race suites.
 CI sets `FRY_TEST_STREAM=1` to render Go's root-test JSON events as live,
-package-labelled output. Use `FRY_TEST_STREAM=1 make check` locally for the same
-progress and immediate failure diagnostics. The renderer preserves build errors,
-panic stacks and the test process's failing exit status. The coverage suite's
+package-labelled output. Use `GOMAXPROCS=2 FRY_TEST_STREAM=1 make check` locally
+to match CI's Go parallelism and streaming diagnostics; this does not reproduce
+the hosted runner's CPU performance or contention. The renderer preserves build
+errors, panic stacks and the test process's failing exit status. Malformed events
+are printed unchanged and cause failure after the remaining output is drained.
+The coverage suite's
 five-minute timeout applies to each entire package, not each individual test;
 explicit operation deadlines inside tests remain separate.
 `make test-browser` runs both administration and member-storage Chromium suites

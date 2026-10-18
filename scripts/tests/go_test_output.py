@@ -46,9 +46,18 @@ class GoTestOutput(unittest.TestCase):
         self.assertEqual(result.getvalue(),
                          '[example/admin] compile failed\n[example/admin] panic\n[example/admin] \tstack frame\n')
 
-    def test_malformed_events_fail(self):
-        with self.assertRaises(json.JSONDecodeError):
-            render(['invalid event'], io.StringIO())
+    def test_malformed_events_preserve_later_diagnostics_and_fail(self):
+        for malformed in ['invalid event', 'null', '[]', '{"Output": 42}']:
+            with self.subTest(malformed=malformed):
+                event = json.dumps({'Package': 'example/admin', 'Output': 'panic\n\tstack frame\n'})
+                result = subprocess.run(
+                    [sys.executable, '-m', 'scripts.lib.go_test_output'],
+                    input=malformed + '\n' + event + '\n',
+                    capture_output=True, text=True, timeout=5, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, malformed + '\n[example/admin] panic\n'
+                                 '[example/admin] \tstack frame\n')
 
     def test_pipeline_preserves_test_failure(self):
         event = json.dumps({'Action': 'output', 'Package': 'example/admin', 'Output': 'FAIL\n'})

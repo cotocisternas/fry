@@ -57,8 +57,9 @@ jobs:
           key: fry-deps-v1-ubuntu24-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.mod', 'go.sum', 'third_party/**/go.mod', 'third_party/**/go.sum', 'tooling/**/go.mod', 'tooling/**/go.sum', 'tooling/rpc/package-lock.json', 'scripts/browser/package-lock.json') }}
           restore-keys: |
             fry-deps-v1-ubuntu24-${{ runner.arch }}-
-      - name: Cache builds
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore builds
+        id: builds
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             .artifacts/cache/go-build
@@ -107,3 +108,11 @@ jobs:
           docker pull --platform linux/amd64 "$runtime"
           make container IMAGE=fry:ci ARCH=amd64
           docker run --rm --pull=never fry:ci -help
+      - name: Save builds
+        if: ${{ !cancelled() && steps.builds.outputs.cache-primary-key != '' && steps.builds.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .artifacts/cache/go-build
+            .artifacts/cache/lint
+          key: ${{ steps.builds.outputs.cache-primary-key }}
