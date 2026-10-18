@@ -2,6 +2,8 @@
 
 Validated on 2026-10-18 against committed baseline
 `0a26c8ea32d42a2fdbf25f2c8854d13c7d3b18ae`, on Linux amd64.
+That commit was subsequently reworded to follow Conventional Commits; its
+replacement is `a55d73a12a4c83c4b3e405f9871c8dd9faadaf04`, with an identical tree.
 The commands below passed in an independent local clone. The in-flight CI,
 browser, security and compatibility changes were not present in that commit;
 this record does not establish their integrated or hosted result.
