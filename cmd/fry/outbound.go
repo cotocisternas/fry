@@ -70,8 +70,7 @@ func startOutbound(
 		runtime.stop(parent)
 		return nil, err
 	}
-	runtime.wg.Add(1)
-	go func() { defer runtime.wg.Done(); runOutbound(ctx, store, worker, cfg) }()
+	runtime.wg.Go(func() { runOutbound(ctx, store, worker, cfg) })
 	return func() { runtime.stop(parent) }, nil
 }
 

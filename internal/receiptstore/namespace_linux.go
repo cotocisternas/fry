@@ -5,6 +5,7 @@ package receiptstore
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 
@@ -106,7 +107,7 @@ func createFolderAncestors(ctx context.Context, tx pgx.Tx, inbox ID, name string
 			existing[prefix] = true
 		}
 	}
-	for i := len(ancestors) - 1; i >= 0; i-- {
+	for _, ancestor := range slices.Backward(ancestors) {
 		id, err := hotstore.NewID()
 		if err != nil {
 			return err
@@ -115,7 +116,7 @@ func createFolderAncestors(ctx context.Context, tx pgx.Tx, inbox ID, name string
 			CreateFolderAncestors(ctx, dbgen.CreateFolderAncestorsParams{
 				ID:    id.String(),
 				Inbox: inbox.String(),
-				Name:  ancestors[i],
+				Name:  ancestor,
 			}); err != nil {
 			return err
 		}

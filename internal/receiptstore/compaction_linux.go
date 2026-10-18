@@ -118,7 +118,7 @@ func (p *Packer) registerRewrite(ctx context.Context, org, source ID) (packJob, 
 		return job, err
 	}
 	if len(job.entries) == 0 {
-		if _, err = dbgen.New(tx).PackerRegisterRewriteUpdateReceipt(ctx, sqlcPointer(source.String())); err != nil {
+		if _, err = dbgen.New(tx).PackerRegisterRewriteUpdateReceipt(ctx, new(source.String())); err != nil {
 			return job, err
 		}
 		if _, err = dbgen.New(tx).PackerRegisterRewriteUpdatePack(ctx, source.String()); err != nil {
@@ -255,8 +255,8 @@ func (p *Packer) registerRewriteReplacement(ctx context.Context, tx pgx.Tx, job 
 			Organization: job.org.String(),
 			ObjectKey:    job.key,
 			Column4:      p.opts.Lease.Microseconds(),
-			SourcePack:   sqlcPointer(job.source.String()),
-			StagingOwner: sqlcPointer(p.staging.FileID().String()),
+			SourcePack:   new(job.source.String()),
+			StagingOwner: new(p.staging.FileID().String()),
 		}); err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func publishRewriteLocations(
 	for _, id := range ids {
 		var next *string
 		if _, ok := included[id]; ok {
-			next = sqlcPointer(job.id.String())
+			next = new(job.id.String())
 		}
 		if _, err := dbgen.New(tx).
 			PackerPublishRewriteUpdateReceipt(ctx, dbgen.PackerPublishRewriteUpdateReceiptParams{
@@ -358,7 +358,7 @@ func publishRewriteLocations(
 	if _, err := dbgen.New(tx).
 		PackerPublishRewriteUpdatePackPublished(ctx, dbgen.PackerPublishRewriteUpdatePackPublishedParams{
 			ID:   job.id.String(),
-			Etag: sqlcPointer(info.ETag),
+			Etag: new(info.ETag),
 		}); err != nil {
 		return err
 	}

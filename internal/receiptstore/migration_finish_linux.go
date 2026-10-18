@@ -293,7 +293,7 @@ func (p *MigrationPass) reconcileMigrationBatch(
 				ID:             x.entry,
 				Job:            p.Job.String(),
 				SeenGeneration: p.Generation,
-				Mail:           sqlcPointer(x.mail),
+				Mail:           new(x.mail),
 			})
 		if e != nil {
 			return 0, e
@@ -470,7 +470,7 @@ func (p *MigrationPass) activateMigrationInbox(ctx context.Context, tx pgx.Tx) e
 	tag, err := dbgen.New(tx).
 		MigrationPassActivateUpdateInbox(ctx, dbgen.MigrationPassActivateUpdateInboxParams{
 			ID:           p.Inbox.String(),
-			MigrationJob: sqlcPointer(p.Job.String()),
+			MigrationJob: new(p.Job.String()),
 		})
 	if err != nil {
 		return err

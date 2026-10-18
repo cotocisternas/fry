@@ -246,7 +246,7 @@ func (p *Packer) recordImage(ctx context.Context, job packJob, size int64, diges
 	if _, err = dbgen.New(tx).
 		PackerRecordImageUpdatePack(ctx, dbgen.PackerRecordImageUpdatePackParams{
 			ID:          job.id.String(),
-			ImageSize:   sqlcPointer(size),
+			ImageSize:   new(size),
 			ImageSha256: digest[:],
 		}); err != nil {
 		return err
@@ -356,7 +356,7 @@ func (p *Packer) beginPackRetirement(ctx context.Context, organization, id ID) (
 }
 
 func revokePackPublication(ctx context.Context, tx pgx.Tx, id ID) error {
-	readers, err := dbgen.New(tx).PackerRetireReadReadPin(ctx, sqlcPointer(id.String()))
+	readers, err := dbgen.New(tx).PackerRetireReadReadPin(ctx, new(id.String()))
 	if err != nil {
 		return err
 	}
@@ -577,7 +577,7 @@ func (p *Packer) recordPackRegistration(ctx context.Context, tx pgx.Tx, job *pac
 			Organization: job.org.String(),
 			ObjectKey:    job.key,
 			Column4:      p.opts.Lease.Microseconds(),
-			StagingOwner: sqlcPointer(p.staging.FileID().String()),
+			StagingOwner: new(p.staging.FileID().String()),
 		}); err != nil {
 		return err
 	}
@@ -669,7 +669,7 @@ func publishPackLocations(ctx context.Context, tx pgx.Tx, job packJob, info obje
 		if _, err := dbgen.New(tx).
 			PackerPublishUpdateReceipt(ctx, dbgen.PackerPublishUpdateReceiptParams{
 				ID:     entry.receipt.ID.String(),
-				PackID: sqlcPointer(job.id.String()),
+				PackID: new(job.id.String()),
 			}); err != nil {
 			return err
 		}
@@ -683,7 +683,7 @@ func publishPackLocations(ctx context.Context, tx pgx.Tx, job packJob, info obje
 	if _, err := dbgen.New(tx).
 		PackerPublishUpdatePack(ctx, dbgen.PackerPublishUpdatePackParams{
 			ID:   job.id.String(),
-			Etag: sqlcPointer(info.ETag),
+			Etag: new(info.ETag),
 		}); err != nil {
 		return err
 	}

@@ -60,8 +60,7 @@ func startCollectors(
 		collectors = append(collectors, collector)
 	}
 	for _, collector := range collectors {
-		wg.Add(1)
-		go func() { defer wg.Done(); runCollector(ctx, collector) }()
+		wg.Go(func() { runCollector(ctx, collector) })
 	}
 	return stop, nil
 }

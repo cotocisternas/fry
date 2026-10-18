@@ -271,9 +271,9 @@ func (r *hotRotation) publishCatalog(ctx context.Context, tx pgx.Tx) error {
 		StoreRotateHotUpdateMemberFile(ctx, dbgen.StoreRotateHotUpdateMemberFileParams{
 			Member:        m.id.String(),
 			FileID:        m.bytes.FileID().String(),
-			RewriteJob:    sqlcPointer(r.job.String()),
+			RewriteJob:    new(r.job.String()),
 			ChargedBytes:  current.size,
-			SealedRecords: sqlcPointer(current.count),
+			SealedRecords: new(current.count),
 			Directory:     m.directory,
 		})
 	if err != nil {
@@ -286,7 +286,7 @@ func (r *hotRotation) publishCatalog(ctx context.Context, tx pgx.Tx) error {
 		StoreRotateHotUpdateMemberFileCurrent(ctx, dbgen.StoreRotateHotUpdateMemberFileCurrentParams{
 			Member:     m.id.String(),
 			FileID:     r.next.FileID().String(),
-			RewriteJob: sqlcPointer(r.job.String()),
+			RewriteJob: new(r.job.String()),
 			Directory:  r.directory,
 		})
 	if err != nil {
@@ -307,7 +307,7 @@ func (r *hotRotation) publishCatalog(ctx context.Context, tx pgx.Tx) error {
 		StoreRotateHotUpdateHotRewrite(ctx, dbgen.StoreRotateHotUpdateHotRewriteParams{
 			ID:             r.job.String(),
 			Member:         m.id.String(),
-			NewIncarnation: sqlcPointer(r.next.FileID().String()),
+			NewIncarnation: new(r.next.FileID().String()),
 		})
 	if err != nil {
 		return err

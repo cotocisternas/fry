@@ -10,9 +10,6 @@ import "fmt"
 // not infer the outer join's nullable owner epoch/closed values correctly.
 // Schema installation and transaction settings/table locks remain explicit.
 
-// sqlcPointer adapts a required application value to an optional query parameter.
-func sqlcPointer[T any](value T) *T { return &value }
-
 // sqlcUint32 preserves pgx's checked narrowing when the public API uses UIDs.
 func sqlcUint32[T ~int16 | ~int32 | ~int64](value T) (uint32, error) {
 	if value < 0 || uint64(value) > 1<<32-1 {

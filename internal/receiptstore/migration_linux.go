@@ -209,7 +209,7 @@ func (p *MigrationPass) freezeMetadata(freeze *MigrationFreeze, now time.Time) (
 	}
 	p.Deadline = freeze.StartedAt.Add(30 * time.Minute)
 	attestation, err := json.Marshal(freeze)
-	return "final", attestation, sqlcPointer(p.Deadline), err
+	return "final", attestation, new(p.Deadline), err
 }
 
 func (f *MigrationFreeze) valid(now time.Time) bool {
@@ -783,14 +783,14 @@ func finishMigrationImport(ctx context.Context, tx pgx.Tx, c claim) error {
 	if _, err := dbgen.New(tx).
 		FinishMigrationImportUpdateMigrationEntry(ctx, dbgen.FinishMigrationImportUpdateMigrationEntryParams{
 			ID:   m.Entry.String(),
-			Mail: sqlcPointer(mail),
+			Mail: new(mail),
 		}); err != nil {
 		return err
 	}
 	_, err := dbgen.New(tx).
 		FinishMigrationImportUpdateMigrationCopy(ctx, dbgen.FinishMigrationImportUpdateMigrationCopyParams{
 			Attempt: c.Attempt.String(),
-			Receipt: sqlcPointer(c.Receipt.String()),
+			Receipt: new(c.Receipt.String()),
 		})
 	return err
 }
@@ -832,7 +832,7 @@ func FingerprintMigrationSource(address, username string, plaintext bool) [32]by
 // A missing inbox row cannot be locked. Migration reservation exclusively holds
 // this key through its used-destination check and reservation commit.
 func lockInboxAdmission(ctx context.Context, tx pgx.Tx, inbox ID) error {
-	_, err := dbgen.New(tx).LockInboxAdmission(ctx, sqlcPointer(inbox.String()))
+	_, err := dbgen.New(tx).LockInboxAdmission(ctx, new(inbox.String()))
 	return err
 }
 
@@ -841,7 +841,7 @@ func lockInboxAdmission(ctx context.Context, tx pgx.Tx, inbox ID) error {
 // Preparation and finalization both recheck migration_job under the row guard;
 // normalized destination order remains the acquisition order for multiple keys.
 func lockOrdinaryInboxAdmission(ctx context.Context, tx pgx.Tx, inbox ID) error {
-	_, err := dbgen.New(tx).LockOrdinaryInboxAdmission(ctx, sqlcPointer(inbox.String()))
+	_, err := dbgen.New(tx).LockOrdinaryInboxAdmission(ctx, new(inbox.String()))
 	return err
 }
 
@@ -875,7 +875,7 @@ func recordMigrationReservation(ctx context.Context, tx pgx.Tx, org, job, inbox 
 	if _, err := dbgen.New(tx).
 		StoreCreateMigrationUpdateInbox(ctx, dbgen.StoreCreateMigrationUpdateInboxParams{
 			ID:           inbox.String(),
-			MigrationJob: sqlcPointer(job.String()),
+			MigrationJob: new(job.String()),
 		}); err != nil {
 		return err
 	}
@@ -1107,7 +1107,7 @@ func (p *MigrationPass) newObservedMigrationCopy(
 	if _, err = dbgen.New(tx).
 		MigrationPassObserveUpdateMigrationEntry(ctx, dbgen.MigrationPassObserveUpdateMigrationEntryParams{
 			ID:      entry,
-			Attempt: sqlcPointer(result.Attempt.String()),
+			Attempt: new(result.Attempt.String()),
 		}); err != nil {
 		return result, err
 	}

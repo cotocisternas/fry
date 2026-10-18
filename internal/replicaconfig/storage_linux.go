@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -209,8 +210,8 @@ type memberClosers struct {
 
 func (g *memberClosers) close() error {
 	g.once.Do(func() {
-		for i := len(g.closers) - 1; i >= 0; i-- {
-			g.err = errors.Join(g.err, g.closers[i]())
+		for _, closeMember := range slices.Backward(g.closers) {
+			g.err = errors.Join(g.err, closeMember())
 		}
 	})
 	return g.err

@@ -39,8 +39,7 @@ func testCleanup(t *testing.T) func(error) {
 			case errors.Is(err, context.Canceled):
 				t.Errorf("fixture cleanup failed (%T): context canceled", err)
 			default:
-				var transportErr *net.OpError
-				if errors.As(err, &transportErr) {
+				if transportErr, ok := errors.AsType[*net.OpError](err); ok {
 					t.Errorf("fixture transport cleanup failed (%T): %v", err, transportErr)
 				} else {
 					t.Errorf("fixture cleanup failed (%T)", err)

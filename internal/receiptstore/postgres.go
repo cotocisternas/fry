@@ -891,10 +891,10 @@ func publishReceiptDestination(ctx context.Context, tx pgx.Tx, receipt ID, d Des
 	var folder *string
 	var date *time.Time
 	if d.Folder != (ID{}) {
-		folder = sqlcPointer(d.Folder.String())
+		folder = new(d.Folder.String())
 	}
 	if !d.InternalDate.IsZero() {
-		date = sqlcPointer(d.InternalDate)
+		date = new(d.InternalDate)
 	}
 	if _, err := dbgen.New(tx).
 		AuthorityFinalizeWithHeaderInsertWork(ctx, dbgen.AuthorityFinalizeWithHeaderInsertWorkParams{
@@ -1121,7 +1121,7 @@ func settleRecordedCopy(
 	}
 	var lane *int64
 	if stored.CapacityLane != nil {
-		lane = sqlcPointer(int64(*stored.CapacityLane))
+		lane = new(int64(*stored.CapacityLane))
 	}
 	if err := settleTargetCapacity(
 		ctx,

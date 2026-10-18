@@ -726,13 +726,11 @@ func TestParallelStreamingReceipts(t *testing.T) {
 	receipts := make(chan Receipt, 4)
 	for range 4 {
 		attempt, e := newID(t), f.envelope(t)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			r, err := f.s.Accept(context.Background(), attempt, e, io.NopCloser(bytes.NewReader(body)))
 			errs <- err
 			receipts <- r
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)

@@ -99,9 +99,8 @@ func reply(w http.ResponseWriter, status int, value any) {
 func failure(w http.ResponseWriter, err error) {
 	problem := rpcError(err)
 	status := legacyErrorStatus(connect.CodeOf(problem))
-	var rpcProblem *connect.Error
 	message := "Administration is temporarily unavailable."
-	if errors.As(problem, &rpcProblem) {
+	if rpcProblem, ok := errors.AsType[*connect.Error](problem); ok {
 		message = rpcProblem.Message()
 	}
 	reply(w, status, map[string]string{"error": message})

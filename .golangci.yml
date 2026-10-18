@@ -37,6 +37,7 @@ linters:
     - revive
     - lll
     - intrange
+    - modernize
     - copyloopvar
     - unconvert
     - asasalint

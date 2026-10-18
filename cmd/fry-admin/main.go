@@ -67,7 +67,7 @@ func (c *client) request(ctx context.Context, method, path string, data any) (*h
 
 func submissionPolicyList(raw string) []string {
 	result := []string{}
-	for _, entry := range strings.Split(raw, ",") {
+	for entry := range strings.SplitSeq(raw, ",") {
 		if entry = strings.TrimSpace(entry); entry != "" {
 			result = append(result, entry)
 		}
@@ -201,8 +201,7 @@ func commandExitCode(err error) int {
 	if err == nil || errors.Is(err, flag.ErrHelp) {
 		return 0
 	}
-	var usage *commandUsageError
-	if errors.As(err, &usage) {
+	if _, ok := errors.AsType[*commandUsageError](err); ok {
 		return 2
 	}
 	return 1

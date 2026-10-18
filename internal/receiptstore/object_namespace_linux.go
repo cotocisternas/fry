@@ -48,7 +48,7 @@ func (s *Store) bindObjectNamespace(ctx context.Context, namespace string) error
 	if history {
 		return ErrObjectNamespace
 	}
-	if _, err = dbgen.New(tx).StoreBindObjectNamespaceUpdateObjectNamespace(ctx, sqlcPointer(namespace)); err != nil {
+	if _, err = dbgen.New(tx).StoreBindObjectNamespaceUpdateObjectNamespace(ctx, new(namespace)); err != nil {
 		return err
 	}
 	return commit(ctx, tx)

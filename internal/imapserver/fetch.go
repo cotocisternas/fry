@@ -126,10 +126,10 @@ func filterHeader(header []byte, include, exclude []string) []byte {
 }
 
 func keepHeaderLine(line []byte, names map[string]bool, exclude bool) bool {
-	colon := bytes.IndexByte(line, ':')
+	before, _, ok := bytes.Cut(line, []byte{':'})
 	name := ""
-	if colon >= 0 {
-		name = strings.ToLower(string(line[:colon]))
+	if ok {
+		name = strings.ToLower(string(before))
 	}
 	keep := names[name]
 	if exclude {

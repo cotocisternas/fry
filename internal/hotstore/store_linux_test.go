@@ -302,13 +302,11 @@ func checkConcurrentRetry(t *testing.T, s *Store) {
 	results := make(chan Locator, 2)
 	errs := make(chan error, 2)
 	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			l, e := s.Append(context.Background(), retryKey, strings.NewReader("retry"))
 			results <- l
 			errs <- e
-		}()
+		})
 	}
 	wg.Wait()
 	close(results)

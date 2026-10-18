@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -504,9 +505,7 @@ func delayMemberIdentityResponse(
 				next.ServeHTTP(recorder, r)
 				close(captured)
 				<-release
-				for key, values := range recorder.Header() {
-					w.Header()[key] = values
-				}
+				maps.Copy(w.Header(), recorder.Header())
 				w.WriteHeader(recorder.Code)
 				if _, err := w.Write(recorder.Body.Bytes()); err != nil {
 					t.Error(err)

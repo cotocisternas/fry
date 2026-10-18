@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"time"
 
 	"github.com/cotocisternas/fry/internal/receiptstore"
@@ -105,10 +106,8 @@ func validateRoute(route Route) (string, string, error) {
 	if err != nil || route.Organization == (receiptstore.ID{}) || len(route.Inboxes) == 0 || len(route.Inboxes) > 1024 {
 		return "", "", fmt.Errorf("smtpserver: invalid route")
 	}
-	for _, id := range route.Inboxes {
-		if id == (receiptstore.ID{}) {
-			return "", "", fmt.Errorf("smtpserver: invalid inbox")
-		}
+	if slices.Contains(route.Inboxes, receiptstore.ID{}) {
+		return "", "", fmt.Errorf("smtpserver: invalid inbox")
 	}
 	return key, domain, nil
 }

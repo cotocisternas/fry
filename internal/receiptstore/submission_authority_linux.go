@@ -5,6 +5,7 @@ package receiptstore
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 
@@ -63,17 +64,10 @@ func SubmissionScopeAllows(senders, domains []string, from string) bool {
 		return false
 	}
 	domain := key[strings.LastIndexByte(key, '@')+1:]
-	for _, s := range a {
-		if s == key {
-			return true
-		}
+	if slices.Contains(a, key) {
+		return true
 	}
-	for _, s := range d {
-		if s == domain {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(d, domain)
 }
 
 func guardSubmissionAuthorization(ctx context.Context, tx pgx.Tx, e Envelope) error {

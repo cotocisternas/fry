@@ -68,6 +68,7 @@ tool upgrades. The first five below are upstream's
 | `depguard` | Administration transports and CLI cannot import generated persistence packages directly. |
 | `revive` (`receiver-naming` only) | Consistent, idiomatic receiver names across methods of a type. Default Revive rules are disabled explicitly. |
 | `lll`, `intrange` | Maximum 120 columns, counting tabs as four; integer-range loops when behavior is preserved. |
+| `modernize` | The pinned Go analyzer suite: standard-library simplifications, iterator loops, typed error extraction, pointer construction and other supported modern Go idioms. |
 | `copyloopvar`, `unconvert` | Redundant loop-variable copies and unnecessary conversions. |
 | `asasalint`, `durationcheck`, `bidichk`, `gocheckcompilerdirectives` | Variadic slice mistakes, suspicious duration arithmetic, bidirectional text controls and malformed compiler directives. |
 | `dupl` | Review structural duplication at 100 tokens; shared logic must preserve semantic responsibilities. |
@@ -100,19 +101,52 @@ Split long string constants without changing their bytes; preserve justified
 statement-level exceptions when formatting moves a call across several lines.
 
 `make lint-policy-check` tests the actual configuration with intentional naming,
-line-length and integer-range violations in production and test files, verifies
-strict generated-code exclusion, then verifies the corrected fixture passes.
+line-length, integer-range and modernization violations in production and test
+files, verifies strict generated-code exclusion, then verifies corrected fixtures
+pass. It asserts `stringscut`, `stringsseq`, `slicescontains` and `slicessort`
+diagnostics individually, so one enabled modernizer cannot mask another missing
+check. Production and test fixtures run separately to avoid introducing deliberate
+duplication into the duplication checker.
 It is part of the existing-code baseline.
-The cleanup and passing integrated checks are recorded in the
-[style-policy validation](../validation/lint-style.md).
+The earlier style cleanup and its integrated checks are recorded in the
+[style-policy validation](../validation/lint-style.md); those results predate
+the modernization follow-up below.
+Its later checks and limits are recorded in the
+[modernization validation](../validation/go-modernization.md).
 
-The broader audit evaluated `modernize` and `dupword` as well. The former reported
-196 root-module suggestions, including 75 `newexpr`, 73 `rangeint` and ten
-`waitgroupgo` findings. Integer ranges are enforced by `intrange`; the remaining
-modernization suite is not enabled wholesale. Pointer construction, iterator and
-goroutine changes require their own semantic review. `dupword` also matched
-intentional repetitions in protocol/message fixtures, so it is not a blocking
-rule. The six additional focused checks above had no initial root findings.
+The earlier audit evaluated `modernize` but enabled only `intrange`. That left
+GoLand modernization suggestions outside CI. The 2026-10-18 follow-up enables
+the complete default `modernize` suite shipped in the pinned linter, without
+category exclusions. The root scan before cleanup reported 124 suggestions.
+Analyzer membership is reviewed when the tool pin changes; this does not enable
+every golangci-lint linter or the upstream analyzers omitted from that suite.
+
+The four reported IDE diagnostics now have explicit CI coverage:
+
+| IDE suggestion | Analyzer | Replacement |
+| --- | --- | --- |
+| `bytes.IndexByte` can be simplified using `bytes.Cut` | `stringscut` | Split once and preserve the not-found branch. |
+| Ranging over `SplitSeq` is more efficient | `stringsseq` | Iterate without allocating a split slice. |
+| Loop can be simplified using `slices.Contains` | `slicescontains` | Use standard-library membership testing. |
+| `sort.Slice` can be modernized using `slices.Sort` | `slicessort` | Use typed sorting where its ordering matches. |
+
+Review fixes rather than treating suggestions as proof of equivalent behavior.
+Preserve nil/empty distinctions, parser boundaries, sort order, cancellation,
+goroutine accounting and shutdown sequencing. Replace trivial pointer factories
+with `new(value)` rather than keeping pass-through wrappers solely for lint.
+See the [Go analyzer descriptions](https://go.dev/gopls/analyzers) and
+[golangci-lint modernize settings](https://golangci-lint.run/docs/linters/configuration/#modernize).
+
+This is not complete GoLand inspection parity. Its
+[redundant-parentheses inspection](https://www.jetbrains.com/help/inspectopedia/GoRedundantParens.html)
+also covers call arguments such as `check((a && b))`; neither the current policy
+nor `modernize` rejects that example. Go-critic's `typeUnparen` checks type
+expressions, not these boolean arguments. Keep this gap explicit instead of
+claiming it is covered by a similarly named rule.
+
+`dupword` matched intentional repetitions in protocol/message fixtures, so it
+remains non-blocking. The six additional focused checks above had no initial
+root findings.
 The checker and formatter behavior is documented by
 [golangci-lint](https://golangci-lint.run/docs/linters/configuration/),
 [Revive](https://github.com/revive-lint/revive/blob/master/RULES_DESCRIPTIONS.md#receiver-naming)

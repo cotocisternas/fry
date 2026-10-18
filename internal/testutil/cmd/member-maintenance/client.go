@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/cotocisternas/fry/internal/replicaconfig"
@@ -23,19 +24,19 @@ import (
 // private release identity identical to receiptstore.memberRelease; a mismatch
 // is a failed rehearsal, never permission to weaken the server's policy.
 func buildRelease() string {
-	result := "prototype-member-grpc-v1"
+	parts := []string{"prototype-member-grpc-v1"}
 	if info, ok := debug.ReadBuildInfo(); ok {
-		result += "/" + info.Main.Version
+		parts = append(parts, info.Main.Version)
 		for _, setting := range info.Settings {
 			if setting.Key == "vcs.revision" {
-				result += "/" + setting.Value
+				parts = append(parts, setting.Value)
 			}
 			if setting.Key == "vcs.modified" {
-				result += "/dirty=" + setting.Value
+				parts = append(parts, "dirty="+setting.Value)
 			}
 		}
 	}
-	return result
+	return strings.Join(parts, "/")
 }
 
 type memberHTTP struct{ client *http.Client }

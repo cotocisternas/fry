@@ -560,7 +560,7 @@ func (r *hotRewrite) publishCatalog(ctx context.Context, tx pgx.Tx) error {
 		StoreRewriteHotUpdateMemberFile(ctx, dbgen.StoreRewriteHotUpdateMemberFileParams{
 			Member:       m.id.String(),
 			FileID:       m.bytes.FileID().String(),
-			RewriteJob:   sqlcPointer(r.job.String()),
+			RewriteJob:   new(r.job.String()),
 			Directory:    m.directory,
 			ChargedBytes: r.oldEncoded,
 		})
@@ -574,7 +574,7 @@ func (r *hotRewrite) publishCatalog(ctx context.Context, tx pgx.Tx) error {
 		StoreRewriteHotUpdateMemberFileCurrent(ctx, dbgen.StoreRewriteHotUpdateMemberFileCurrentParams{
 			Member:     m.id.String(),
 			FileID:     r.next.FileID().String(),
-			RewriteJob: sqlcPointer(r.job.String()),
+			RewriteJob: new(r.job.String()),
 			Directory:  r.directory,
 		})
 	if err != nil {
@@ -782,7 +782,7 @@ func (m *LocalMember) reconcileBuildingRewrite(ctx context.Context, job rewriteR
 			LocalMemberReconcileRewritesUpdateMemberFile(ctx, dbgen.LocalMemberReconcileRewritesUpdateMemberFileParams{
 				Member:     m.id.String(),
 				FileID:     *job.next,
-				RewriteJob: sqlcPointer(job.id),
+				RewriteJob: new(job.id),
 			})
 	}
 	if err == nil {
@@ -882,7 +882,7 @@ func (m *LocalMember) finishRemovedHotRewrite(ctx context.Context, job rewriteRe
 				dbgen.LocalMemberReconcileRewritesUpdateMemberFileRemovedParams{
 					Member:     m.id.String(),
 					FileID:     job.inc,
-					RewriteJob: sqlcPointer(job.id),
+					RewriteJob: new(job.id),
 				},
 			)
 	}

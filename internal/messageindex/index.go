@@ -176,11 +176,11 @@ func delimiter(l *line, boundaries []string) (int, bool) {
 		b = bytes.TrimSuffix(b, []byte("\r"))
 	}
 	b = bytes.TrimRight(b, " \t")
-	for i := len(boundaries) - 1; i >= 0; i-- {
-		if string(b) == "--"+boundaries[i] {
+	for i, boundary := range slices.Backward(boundaries) {
+		if string(b) == "--"+boundary {
 			return i, false
 		}
-		if string(b) == "--"+boundaries[i]+"--" {
+		if string(b) == "--"+boundary+"--" {
 			return i, true
 		}
 	}

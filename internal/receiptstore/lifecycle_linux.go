@@ -326,7 +326,7 @@ func setReferenceExpiry(
 		if !ref.ExpiresAt.After(now) {
 			return ErrExpired
 		}
-		params.ExpiresAt = sqlcPointer(ref.ExpiresAt.UTC().Truncate(time.Microsecond))
+		params.ExpiresAt = new(ref.ExpiresAt.UTC().Truncate(time.Microsecond))
 	}
 	return nil
 }

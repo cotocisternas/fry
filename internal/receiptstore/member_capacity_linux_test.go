@@ -267,13 +267,11 @@ func TestMemberCapacityConcurrentAdmissionCannotOverbook(t *testing.T) {
 	results := make(chan error, 2)
 	var wg sync.WaitGroup
 	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			_, err := capacityAccept(ctx, f, newID(t), f.envelope(t), "concurrent original")
 			results <- err
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()

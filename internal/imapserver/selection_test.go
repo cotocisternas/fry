@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -193,10 +194,8 @@ func hasVirtualParent(listed []*imap.ListData, name string) bool {
 		if entry.Mailbox != name {
 			continue
 		}
-		for _, attr := range entry.Attrs {
-			if attr == imap.MailboxAttrNoSelect {
-				return true
-			}
+		if slices.Contains(entry.Attrs, imap.MailboxAttrNoSelect) {
+			return true
 		}
 	}
 	return false

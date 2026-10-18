@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -155,10 +156,8 @@ func validationRoleSession(account, raw string) ([]string, error) {
 	if len(roleSession) < 2 || roleSession[len(roleSession)-1] == "" {
 		return nil, fmt.Errorf("AWS validation malformed assumed role")
 	}
-	for _, part := range roleSession {
-		if part == "" {
-			return nil, fmt.Errorf("AWS validation malformed assumed role")
-		}
+	if slices.Contains(roleSession, "") {
+		return nil, fmt.Errorf("AWS validation malformed assumed role")
 	}
 	return roleSession, nil
 }
@@ -177,11 +176,10 @@ func validationErrorLabel(err error) string {
 	if err == nil {
 		return "success"
 	}
-	var api smithy.APIError
 	var status interface{ HTTPStatusCode() int }
 	code := "non-API-error"
 	httpStatus := 0
-	if errors.As(err, &api) {
+	if api, ok := errors.AsType[smithy.APIError](err); ok {
 		code = api.ErrorCode()
 	}
 	if errors.As(err, &status) {

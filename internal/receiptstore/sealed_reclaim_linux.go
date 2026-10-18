@@ -139,7 +139,7 @@ func (m *LocalMember) readSealedSelection(
 				dbgen.LocalMemberSelectSealedUpdateMemberMaintenanceParams{
 					ID:           operation.String(),
 					Member:       m.id.String(),
-					SelectedFile: sqlcPointer(file),
+					SelectedFile: new(file),
 				},
 			)
 		if err != nil {
@@ -353,7 +353,7 @@ func (r *sealedReclaim) reserveTx(ctx context.Context, tx pgx.Tx) (bool, error) 
 			OldDirectory:   r.source.directory,
 			NewDirectory:   r.directory,
 			ReservedBytes:  charge,
-			KeptRecords:    sqlcPointer(r.kept),
+			KeptRecords:    new(r.kept),
 		})
 	return true, err
 }
@@ -481,9 +481,9 @@ func (r *sealedReclaim) publishSuccessor(ctx context.Context, tx pgx.Tx) error {
 		StoreReclaimSealedFileUpdateMemberFile(ctx, dbgen.StoreReclaimSealedFileUpdateMemberFileParams{
 			Member:        m.id.String(),
 			FileID:        r.nextID.String(),
-			RewriteJob:    sqlcPointer(r.job.String()),
+			RewriteJob:    new(r.job.String()),
 			ChargedBytes:  r.nextSize,
-			SealedRecords: sqlcPointer(r.kept),
+			SealedRecords: new(r.kept),
 		})
 	if err != nil {
 		return err
@@ -523,10 +523,10 @@ func (r *sealedReclaim) publishRetirement(ctx context.Context, tx pgx.Tx) error 
 		StoreReclaimSealedFileUpdateMemberFileRetiring(ctx, dbgen.StoreReclaimSealedFileUpdateMemberFileRetiringParams{
 			Member:        m.id.String(),
 			FileID:        r.source.file.String(),
-			RewriteJob:    sqlcPointer(r.job.String()),
+			RewriteJob:    new(r.job.String()),
 			Directory:     r.source.directory,
 			ChargedBytes:  r.source.size,
-			SealedRecords: sqlcPointer(r.source.count),
+			SealedRecords: new(r.source.count),
 		})
 	if err != nil {
 		return err
@@ -538,7 +538,7 @@ func (r *sealedReclaim) publishRetirement(ctx context.Context, tx pgx.Tx) error 
 		StoreReclaimSealedFileUpdateHotRewrite(ctx, dbgen.StoreReclaimSealedFileUpdateHotRewriteParams{
 			ID:          r.job.String(),
 			Member:      m.id.String(),
-			KeptRecords: sqlcPointer(r.kept),
+			KeptRecords: new(r.kept),
 		})
 	if err != nil {
 		return err
@@ -762,7 +762,7 @@ func (m *LocalMember) discardSealedSuccessor(ctx context.Context, tx pgx.Tx, j s
 			dbgen.LocalMemberReconcileSealedReclaimUpdateMemberFileParams{
 				Member:     m.id.String(),
 				FileID:     *j.next,
-				RewriteJob: sqlcPointer(j.id),
+				RewriteJob: new(j.id),
 			},
 		)
 	if err != nil {
@@ -789,7 +789,7 @@ func (m *LocalMember) finishRemovedSealedReclaim(ctx context.Context, j sealedRe
 			dbgen.LocalMemberReconcileSealedReclaimUpdateMemberFileRemovedParams{
 				Member:     m.id.String(),
 				FileID:     j.old,
-				RewriteJob: sqlcPointer(j.id),
+				RewriteJob: new(j.id),
 			},
 		)
 	if err != nil {

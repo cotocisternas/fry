@@ -16,7 +16,6 @@ import (
 	"github.com/cotocisternas/fry/internal/receiptstore"
 )
 
-func quotaString(v string) *string { return &v }
 func TestStorageQuotaDecimalValidation(t *testing.T) {
 	for _, v := range []string{"", "0", "-1", "+1", " 1", "1.0", "1e3", "9223372036854775808"} {
 		{
@@ -40,18 +39,18 @@ func TestStorageQuotaScopeAndAdvisoryTransitions(t *testing.T) {
 	check(t, f.service.PutOrganization(ctx, f.root.Token, Organization{third, "Third"}))
 	check(t, f.service.ReplaceGrants(ctx, f.root.Token, manager.Identity.ID, []Grant{{Scope: f.org}, {Scope: f.other}}))
 	for _, org := range []string{f.org, f.other} {
-		check(t, f.service.SetStorageQuota(ctx, manager.Token, org, quotaString("1")))
+		check(t, f.service.SetStorageQuota(ctx, manager.Token, org, new("1")))
 		if _, err := f.service.StorageUsage(ctx, manager.Token, org); err != nil {
 			t.Fatal(err)
 		}
 	}
-	requireErrorIs(t, f.service.SetStorageQuota(ctx, manager.Token, third, quotaString("1")), ErrForbidden)
+	requireErrorIs(t, f.service.SetStorageQuota(ctx, manager.Token, third, new("1")), ErrForbidden)
 	{
 		_, err := f.service.StorageUsage(ctx, manager.Token, third)
 		requireErrorIs(t, err, ErrForbidden)
 	}
-	check(t, f.service.SetStorageQuota(ctx, f.root.Token, third, quotaString("9223372036854775807")))
-	requireErrorIs(t, f.service.SetStorageQuota(ctx, f.root.Token, newID(t), quotaString("1")), ErrInvalid)
+	check(t, f.service.SetStorageQuota(ctx, f.root.Token, third, new("9223372036854775807")))
+	requireErrorIs(t, f.service.SetStorageQuota(ctx, f.root.Token, newID(t), new("1")), ErrInvalid)
 	checkStorageTransitions(t, f, manager)
 }
 
@@ -59,12 +58,14 @@ func TestStorageQuotaConcurrentSamplesAndFailureRollback(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.receive(t)
-	check(t, f.service.SetStorageQuota(ctx, f.root.Token, f.org, quotaString("1")))
+	check(t, f.service.SetStorageQuota(ctx, f.root.Token, f.org, new("1")))
 	var wg sync.WaitGroup
 	results := make(chan error, 2)
 	for range 2 {
-		wg.Add(1)
-		go func() { defer wg.Done(); _, err := f.service.EvaluateStorageQuotas(ctx, 1); results <- err }()
+		wg.Go(func() {
+			_, err := f.service.EvaluateStorageQuotas(ctx, 1)
+			results <- err
+		})
 	}
 	wg.Wait()
 	close(results)
@@ -83,8 +84,8 @@ func TestStorageQuotaLockedPolicySkipsAndDoesNotBlockAcceptance(t *testing.T) {
 	f := setup(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	check(t, f.service.SetStorageQuota(ctx, f.root.Token, f.org, quotaString("1")))
-	check(t, f.service.SetStorageQuota(ctx, f.root.Token, f.other, quotaString("1")))
+	check(t, f.service.SetStorageQuota(ctx, f.root.Token, f.org, new("1")))
+	check(t, f.service.SetStorageQuota(ctx, f.root.Token, f.other, new("1")))
 	held, err := f.db.Begin(ctx)
 	check(t, err)
 	defer rollback(ctx, held)
@@ -255,7 +256,7 @@ func checkStoragePolicyChanges(t *testing.T, f *fixture, manager Session, retain
 	t.Helper()
 	ctx := context.Background()
 	var err error
-	check(t, f.service.SetStorageQuota(ctx, manager.Token, f.org, quotaString(retained))) // equality is within limit.
+	check(t, f.service.SetStorageQuota(ctx, manager.Token, f.org, new(retained))) // equality is within limit.
 	updated, err := f.service.StorageUsage(ctx, manager.Token, f.org)
 	check(t, err)
 	if !updated.AlertActive || !updated.SampleStale {
@@ -268,7 +269,7 @@ func checkStoragePolicyChanges(t *testing.T, f *fixture, manager Session, retain
 	if equal.AlertActive {
 		t.Fatal("equal threshold exceeded")
 	}
-	check(t, f.service.SetStorageQuota(ctx, manager.Token, f.org, quotaString("1")))
+	check(t, f.service.SetStorageQuota(ctx, manager.Token, f.org, new("1")))
 	_, err = f.service.EvaluateStorageQuotas(ctx, 64)
 	check(t, err)
 	check(t, f.service.SetStorageQuota(ctx, manager.Token, f.org, nil))

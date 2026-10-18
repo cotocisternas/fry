@@ -185,7 +185,7 @@ func mimeLanguages(header mail.Header) ([]string, error) {
 		if strings.Count(value, ",") >= 128 {
 			return nil, fmt.Errorf("imap: excessive content languages")
 		}
-		for _, language := range strings.Split(value, ",") {
+		for language := range strings.SplitSeq(value, ",") {
 			languages = append(languages, strings.TrimSpace(language))
 		}
 	}

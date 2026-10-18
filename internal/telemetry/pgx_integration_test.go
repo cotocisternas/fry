@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -148,10 +149,8 @@ func hasPostgresCount(metrics []*metricspb.Metric) bool {
 		if metric.Name != "fry.operation.count" || metric.GetSum() == nil {
 			continue
 		}
-		for _, point := range metric.GetSum().DataPoints {
-			if isPostgresCount(point) {
-				return true
-			}
+		if slices.ContainsFunc(metric.GetSum().DataPoints, isPostgresCount) {
+			return true
 		}
 	}
 	return false

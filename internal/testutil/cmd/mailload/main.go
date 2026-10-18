@@ -175,11 +175,9 @@ func smtpLoad(ctx context.Context, c config, run string, r *report) []bool {
 	var workers sync.WaitGroup
 	start := time.Now()
 	for range c.concurrency {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
+		workers.Go(func() {
 			runSMTPWorker(ctx, c, run, &next, results)
-		}()
+		})
 	}
 	go func() { workers.Wait(); close(results) }()
 	accepted := make([]bool, c.count)
@@ -665,7 +663,7 @@ func validWorkload(c config) bool {
 }
 
 func parseProcessMetadata(m map[string]any, file string, data []byte) {
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if strings.HasPrefix(line, "model name") || strings.HasPrefix(line, "MemTotal:") ||
 			strings.HasPrefix(line, "VmHWM:") {
 			key, value, ok := strings.Cut(line, ":")

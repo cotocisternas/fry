@@ -4,6 +4,7 @@ package imapserver
 
 import (
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/cotocisternas/fry/internal/receiptstore"
@@ -21,12 +22,7 @@ func flags(m receiptstore.Mail) []imap.Flag {
 }
 
 func hasFlag(m receiptstore.Mail, flag string) bool {
-	for _, f := range m.Flags {
-		if f == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Flags, flag)
 }
 
 // current never replaces the session's sequence-number view. Until EXPUNGE is

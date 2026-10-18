@@ -252,7 +252,7 @@ func (p *memberProcess) address(t *testing.T) string {
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		for _, line := range strings.Split(p.logs(t), "\n") {
+		for line := range strings.SplitSeq(p.logs(t), "\n") {
 			if _, address, ok := strings.Cut(line, "listening with mutual TLS on "); ok {
 				return strings.TrimSpace(address)
 			}

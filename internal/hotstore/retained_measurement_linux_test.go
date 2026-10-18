@@ -73,7 +73,7 @@ func retainedRSS() (map[string]int64, error) {
 		return nil, err
 	}
 	result := map[string]int64{}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 3 && (fields[0] == "VmRSS:" || fields[0] == "VmHWM:") {
 			n, err := strconv.ParseInt(fields[1], 10, 64)

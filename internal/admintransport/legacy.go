@@ -323,8 +323,7 @@ func (h *HTTP) legacyPostStorageQuota(w http.ResponseWriter, r *http.Request) (v
 			err = h.service.SetStorageQuota(ctx, token, input.Organization, limit)
 		}
 		if err != nil {
-			var typeErr *json.UnmarshalTypeError
-			if errors.As(err, &typeErr) {
+			if _, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 				err = admin.ErrInvalid
 			}
 		}

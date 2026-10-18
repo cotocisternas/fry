@@ -137,7 +137,7 @@ func (m *LocalMember) startMaintenance(
 	if _, err := dbgen.New(tx).
 		LocalMemberBeginMaintenanceKindUpdateMember(ctx, dbgen.LocalMemberBeginMaintenanceKindUpdateMemberParams{
 			ID:             m.id.String(),
-			MaintenanceJob: sqlcPointer(operation.String()),
+			MaintenanceJob: new(operation.String()),
 		}); err != nil {
 		return err
 	}

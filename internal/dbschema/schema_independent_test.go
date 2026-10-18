@@ -119,8 +119,10 @@ func TestSchemaConcurrentInitializationHasOneCompleteWinner(t *testing.T) {
 	results := make(chan error, 2)
 	var workers sync.WaitGroup
 	for range 2 {
-		workers.Add(1)
-		go func() { defer workers.Done(); <-start; results <- dbschema.Initialize(ctx, p, components()) }()
+		workers.Go(func() {
+			<-start
+			results <- dbschema.Initialize(ctx, p, components())
+		})
 	}
 	close(start)
 	workers.Wait()

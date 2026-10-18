@@ -171,7 +171,7 @@ func checkSyntheticMessage(t *testing.T, size int) {
 	if parsed.Header.Get("X-Fry-Load-SHA256") != hex.EncodeToString(digest[:]) {
 		t.Fatal("body hash mismatch")
 	}
-	for _, line := range bytes.Split(raw, []byte("\r\n")) {
+	for line := range bytes.SplitSeq(raw, []byte("\r\n")) {
 		if len(line) > 998 {
 			t.Fatal("oversized SMTP line", len(line))
 		}

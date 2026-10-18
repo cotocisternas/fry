@@ -127,9 +127,9 @@ func (o *memberOwner) registerReadPin(
 		MemberOwnerReadInsertReadPin(work, dbgen.MemberOwnerReadInsertReadPinParams{
 			ID:          operation.String(),
 			Receipt:     request.receipt.String(),
-			OwnerMember: sqlcPointer(m.id.String()),
-			OwnerEpoch:  sqlcPointer(o.epoch),
-			Incarnation: sqlcPointer(incarnation.String()),
+			OwnerMember: new(m.id.String()),
+			OwnerEpoch:  new(o.epoch),
+			Incarnation: new(incarnation.String()),
 			ID_2:        request.pin.String(),
 		}); err != nil {
 		return memberReadSource{}, 0, err
@@ -179,8 +179,8 @@ func (o *memberOwner) confirmReadClosure(cleanup context.Context, operation ID) 
 		_, err = dbgen.New(closeTx).
 			MemberOwnerReadDeleteReadPin(cleanup, dbgen.MemberOwnerReadDeleteReadPinParams{
 				ID:          operation.String(),
-				OwnerMember: sqlcPointer(m.id.String()),
-				OwnerEpoch:  sqlcPointer(o.epoch),
+				OwnerMember: new(m.id.String()),
+				OwnerEpoch:  new(o.epoch),
 			})
 	}
 	if err == nil {

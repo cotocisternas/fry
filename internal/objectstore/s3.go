@@ -87,8 +87,7 @@ func (store *S3) checkBucketPolicy(ctx context.Context) error {
 }
 
 func apiCode(err error, codes ...string) bool {
-	var api smithy.APIError
-	if errors.As(err, &api) {
+	if api, ok := errors.AsType[smithy.APIError](err); ok {
 		for _, c := range codes {
 			if api.ErrorCode() == c {
 				return true

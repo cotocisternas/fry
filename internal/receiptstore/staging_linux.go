@@ -110,7 +110,7 @@ func (p *Packer) finishStagingPack(ctx context.Context, id ID) error {
 	tag, err := dbgen.New(tx).
 		PackerReconcileStagingUpdatePack2(ctx, dbgen.PackerReconcileStagingUpdatePack2Params{
 			ID:           id.String(),
-			StagingOwner: sqlcPointer(p.staging.FileID().String()),
+			StagingOwner: new(p.staging.FileID().String()),
 		})
 	if err == nil && tag.RowsAffected() != 1 {
 		err = fmt.Errorf("receiptstore: staging ownership changed")

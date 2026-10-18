@@ -91,7 +91,7 @@ func DomainValid(domain string) bool {
 	if domain == "" || len(domain) > 253 {
 		return false
 	}
-	for _, label := range strings.Split(domain, ".") {
+	for label := range strings.SplitSeq(domain, ".") {
 		if !domainLabelValid(label) {
 			return false
 		}

@@ -40,7 +40,7 @@ func readModule(root *os.Root) (string, error) {
 		return "", err
 	}
 	module := ""
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		line, _, _ = strings.Cut(line, "//")
 		fields := strings.Fields(line)
 		if len(fields) == 0 || fields[0] != "module" {

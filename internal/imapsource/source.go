@@ -237,7 +237,7 @@ func expandUIDs(result imap.UIDSet, first, last uint32) ([]uint32, error) {
 			}
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	slices.Sort(out)
 	return out, nil
 }
 

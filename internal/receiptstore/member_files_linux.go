@@ -302,7 +302,7 @@ func verifyRegisteredFile(
 			FileID:     file,
 			Directory:  dir,
 			State:      state,
-			RewriteJob: sqlcPointer(job),
+			RewriteJob: new(job),
 		})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -386,7 +386,7 @@ func (m *LocalMember) registerSuccessor(ctx context.Context, job ID, dir string,
 		LocalMemberRegisterSuccessorUpdateHotRewrite(ctx, dbgen.LocalMemberRegisterSuccessorUpdateHotRewriteParams{
 			ID:             job.String(),
 			Member:         m.id.String(),
-			NewIncarnation: sqlcPointer(file.String()),
+			NewIncarnation: new(file.String()),
 			NewDirectory:   dir,
 		})
 	if err != nil {
@@ -400,7 +400,7 @@ func (m *LocalMember) registerSuccessor(ctx context.Context, job ID, dir string,
 			Member:     m.id.String(),
 			FileID:     file.String(),
 			Directory:  dir,
-			RewriteJob: sqlcPointer(job.String()),
+			RewriteJob: new(job.String()),
 		})
 	if err != nil {
 		return err

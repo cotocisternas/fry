@@ -79,15 +79,15 @@ func CanonicalSenderScope(scope string) (string, error) {
 	if err := validateSenderDomainLabels(domain); err != nil {
 		return "", err
 	}
-	if at := strings.LastIndexByte(scope, '@'); at >= 0 {
-		return scope[:at] + "@" + domain, nil
+	if before, _, ok := strings.CutLast(scope, "@"); ok {
+		return before + "@" + domain, nil
 	}
 	return domain, nil
 }
 
 func senderDomain(scope string) string {
-	if at := strings.LastIndexByte(scope, '@'); at >= 0 {
-		return scope[at+1:]
+	if _, after, ok := strings.CutLast(scope, "@"); ok {
+		return after
 	}
 	return scope
 }
@@ -254,7 +254,7 @@ func CompleteSenderChallenge(
 	if _, err = dbgen.New(tx).
 		CompleteSenderChallengeUpdateSenderChallenge(ctx, dbgen.CompleteSenderChallengeUpdateSenderChallengeParams{
 			ID:          id.String(),
-			CompletedBy: sqlcPointer(actor),
+			CompletedBy: new(actor),
 		}); err != nil {
 		return result, err
 	}
@@ -461,7 +461,7 @@ func validateSenderLocalPart(scope string, at int) error {
 }
 
 func validateSenderDomainLabels(domain string) error {
-	for _, label := range strings.Split(domain, ".") {
+	for label := range strings.SplitSeq(domain, ".") {
 		if len(label) < 1 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
 			return ErrSenderAuthorization
 		}

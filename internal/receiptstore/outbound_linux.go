@@ -212,8 +212,8 @@ func (s *Store) completeOutboundTx(
 		StoreCompleteOutboundUpdateOutbound2(ctx, dbgen.StoreCompleteOutboundUpdateOutbound2Params{
 			ID:           claim.ID.String(),
 			State:        result.State,
-			ResponseCode: sqlcPointer(code),
-			Diagnostic:   sqlcPointer(result.Diagnostic),
+			ResponseCode: new(code),
+			Diagnostic:   new(result.Diagnostic),
 		}); err != nil {
 		return err
 	}
@@ -336,16 +336,13 @@ func queueOutboundFailure(
 }
 
 func retryOutboundTx(ctx context.Context, tx pgx.Tx, id ID, result OutboundResult, code int32) error {
-	delay := result.RetryAfter
-	if delay < time.Second {
-		delay = time.Second
-	}
+	delay := max(result.RetryAfter, time.Second)
 	_, err := dbgen.New(tx).
 		StoreCompleteOutboundUpdateOutbound(ctx, dbgen.StoreCompleteOutboundUpdateOutboundParams{
 			ID:           id.String(),
 			Column2:      delay.Microseconds(),
-			ResponseCode: sqlcPointer(code),
-			Diagnostic:   sqlcPointer(result.Diagnostic),
+			ResponseCode: new(code),
+			Diagnostic:   new(result.Diagnostic),
 		})
 	if err != nil {
 		return err

@@ -187,13 +187,11 @@ func peerFixture(t *testing.T) (string, *wirePeer) {
 	path := filepath.Join(t.TempDir(), "member.json")
 	data, err := json.Marshal(
 		config{
-			MemberConfig: replicaconfig.MemberConfig{
-				URL:       server.URL,
-				ID:        fixtureMember,
-				Domain:    "fixture",
-				ServerKey: pin,
-			},
-			TLS: trust,
+			URL:       server.URL,
+			ID:        fixtureMember,
+			Domain:    "fixture",
+			ServerKey: pin,
+			TLS:       trust,
 		},
 	)
 	if err != nil {

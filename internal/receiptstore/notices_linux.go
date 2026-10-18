@@ -115,7 +115,7 @@ func (s *Store) queueFailureNotice(ctx context.Context, id ID, hostname string, 
 	if _, e = dbgen.New(s.db.pool).
 		StoreQueueFailureNoticesUpdateFailureNotice(ctx, dbgen.StoreQueueFailureNoticesUpdateFailureNoticeParams{
 			ID:      id.String(),
-			Receipt: sqlcPointer(receipt.ID.String()),
+			Receipt: new(receipt.ID.String()),
 		}); e != nil {
 		return e
 	}
@@ -140,8 +140,8 @@ func noticeRendering(
 		if _, err := dbgen.New(tx).
 			StorePrepareNoticeUpdateFailureNotice(ctx, dbgen.StorePrepareNoticeUpdateFailureNoticeParams{
 				ID:                 id.String(),
-				RenderingHost:      sqlcPointer(hostname),
-				NoticeRetrySeconds: sqlcPointer(int64(retryWindow / time.Second)),
+				RenderingHost:      new(hostname),
+				NoticeRetrySeconds: new(int64(retryWindow / time.Second)),
 			}); err != nil {
 			return "", 0, err
 		}

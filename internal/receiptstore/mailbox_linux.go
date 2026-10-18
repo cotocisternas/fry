@@ -870,7 +870,7 @@ func (s *Store) deferMailboxWork(ctx context.Context, work mailboxWork, cause er
 		StorePublishMailboxes(ctx, dbgen.StorePublishMailboxesParams{
 			Receipt:   work.r.String(),
 			Inbox:     work.i.String(),
-			LastError: sqlcPointer(code),
+			LastError: new(code),
 		})
 	return err
 }

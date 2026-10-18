@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/cotocisternas/fry/internal/receiptstore/dbgen"
@@ -32,19 +33,19 @@ func memberRelease() string {
 	if release != "" {
 		return release
 	}
-	result := "prototype-member-grpc-v1"
+	parts := []string{"prototype-member-grpc-v1"}
 	if info, ok := debug.ReadBuildInfo(); ok {
-		result += "/" + info.Main.Version
+		parts = append(parts, info.Main.Version)
 		for _, setting := range info.Settings {
 			if setting.Key == "vcs.revision" {
-				result += "/" + setting.Value
+				parts = append(parts, setting.Value)
 			}
 			if setting.Key == "vcs.modified" {
-				result += "/dirty=" + setting.Value
+				parts = append(parts, "dirty="+setting.Value)
 			}
 		}
 	}
-	return result
+	return strings.Join(parts, "/")
 }
 
 func validMemberCertificates(state *tls.ConnectionState) bool {
@@ -69,8 +70,7 @@ func memberRPCError(err error) error {
 	if errors.Is(err, errReadClosureUncertain) {
 		return connect.NewError(connect.CodeDataLoss, "member read closure uncertain").WithCause(err)
 	}
-	var wireError *connect.Error
-	if errors.As(err, &wireError) {
+	if _, ok := errors.AsType[*connect.Error](err); ok {
 		return err
 	}
 	code := connect.CodeUnavailable

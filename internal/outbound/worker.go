@@ -134,8 +134,7 @@ func classifyHandoff(result receiptstore.OutboundResult, err error) receiptstore
 		result.Diagnostic = "Accepted by selected relay"
 	} else {
 		result.Diagnostic = "Relay connection or transfer interrupted"
-		var smtpError *smtp.SMTPError
-		if errors.As(err, &smtpError) {
+		if smtpError, ok := errors.AsType[*smtp.SMTPError](err); ok {
 			result.ResponseCode = smtpError.Code
 			result.Diagnostic = "Selected relay rejected SMTP operation"
 			if smtpError.Code >= 500 && smtpError.Code <= 599 {

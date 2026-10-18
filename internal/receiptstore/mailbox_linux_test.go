@@ -166,13 +166,11 @@ func publishMailboxConcurrently(t *testing.T, ctx context.Context, f *fixture) {
 	t.Helper()
 	var wg sync.WaitGroup
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if _, err := f.s.PublishMailboxes(ctx, 20); err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

@@ -69,9 +69,10 @@ Local evidence: `.artifacts/lint-style/final-baseline.log`,
 manifests. The first coverage failure is retained in
 `.artifacts/lint-style/first-baseline.log`.
 
-The broad `modernize` suite remains an audit tool rather than a blocking rule:
-its pointer-construction, iterator and goroutine suggestions need separate
-semantic review. This cleanup does not complete the outstanding release,
+At the time of this validation, the broad `modernize` suite was an audit tool
+rather than a blocking rule. The later GoLand follow-up enabled it after a
+separate semantic review; see the [current policy](../research/go-quality-policy.md).
+This historical cleanup did not complete the outstanding release,
 security, CI, native arm64 or production-scale gates.
 
 See [the policy and research](../research/go-quality-policy.md) and

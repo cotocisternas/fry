@@ -62,20 +62,8 @@ func memberCapacityLaneCount(opts hotstore.Options) int64 {
 	if err != nil || e <= 0 {
 		return 0
 	}
-	n := (opts.MaxFileBytes - memberFileHeaderBytes) / e / 8
-	if n < 1 {
-		n = 1
-	}
-	if n > 16 {
-		n = 16
-	}
-	if n > int64(opts.MaxConcurrentAppends) {
-		n = int64(opts.MaxConcurrentAppends)
-	}
-	if n > opts.MaxRecords {
-		n = opts.MaxRecords
-	}
-	return n
+	n := max((opts.MaxFileBytes-memberFileHeaderBytes)/e/8, 1)
+	return min(n, 16, int64(opts.MaxConcurrentAppends), opts.MaxRecords)
 }
 
 func capacityLaneCeilings(opts hotstore.Options, lane int64) (int64, int64) {
@@ -431,10 +419,10 @@ func settleTargetCapacity(
 		SettleTargetCapacityUpdateTarget(ctx, dbgen.SettleTargetCapacityUpdateTargetParams{
 			Attempt:                 attempt.String(),
 			Member:                  member.String(),
-			CapacityReservedBytes:   sqlcPointer(actual),
+			CapacityReservedBytes:   new(actual),
 			Incarnation:             loc.File.String(),
-			CapacityReservedBytes_2: sqlcPointer(*reservation),
-			CapacityLane:            sqlcPointer(int16(laneNumber)),
+			CapacityReservedBytes_2: new(*reservation),
+			CapacityLane:            new(int16(laneNumber)),
 		})
 	if err != nil {
 		return err
@@ -506,7 +494,7 @@ func setSuccessorCapacity(
 				Lane:            int16(lane),
 				ReservedRecords: counts[lane],
 				ReservedBytes:   bytes[lane],
-				RewriteJob:      sqlcPointer(job.String()),
+				RewriteJob:      new(job.String()),
 			})
 		if err != nil {
 			return err

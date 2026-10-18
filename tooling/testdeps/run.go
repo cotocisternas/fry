@@ -63,8 +63,7 @@ func runChild(
 	}
 	err = errors.Join(err, killErr)
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok && status.Signaled() {
 				return 128 + int(status.Signal()), err
 			}

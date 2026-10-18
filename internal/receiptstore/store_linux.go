@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -303,8 +304,8 @@ func lockMemberSet(members []Member) func() {
 		}
 	}
 	return func() {
-		for i := len(locked) - 1; i >= 0; i-- {
-			locked[i].gate.RUnlock()
+		for _, l := range slices.Backward(locked) {
+			l.gate.RUnlock()
 		}
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -269,7 +270,7 @@ func (c *acceptanceCapture) stop() error {
 
 func acceptanceLatency(samples []time.Duration) map[string]float64 {
 	sorted := append([]time.Duration(nil), samples...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	slices.Sort(sorted)
 	result := map[string]float64{}
 	for _, p := range []int{50, 95, 99, 100} {
 		index := (len(sorted)*p+99)/100 - 1
@@ -825,9 +826,7 @@ func launchAcceptanceWorkers(
 	start := make(chan struct{})
 	ready := make(chan struct{}, acceptanceMeasurementWorkers)
 	for range acceptanceMeasurementWorkers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			ready <- struct{}{}
 			<-start
 			for {
@@ -845,7 +844,7 @@ func launchAcceptanceWorkers(
 				)
 				latencies[index] = time.Since(begin)
 			}
-		}()
+		})
 	}
 	for range acceptanceMeasurementWorkers {
 		<-ready
