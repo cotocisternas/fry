@@ -114,8 +114,7 @@ func emptyMemberStorage(t *testing.T, snapshot receiptstore.MemberStorageSnapsho
 func TestMemberStorageGlobalOnlyAndSingleConnectionCheckout(t *testing.T) {
 	tracer := &memberStorageQueryTracer{}
 	f := memberStorageSingleConnectionFixture(t, tracer)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx := context.Background()
 	member := memberStorageFixtureMember(t, f)
 	manager := f.manager(t, true)
 	check(
@@ -127,6 +126,17 @@ func TestMemberStorageGlobalOnlyAndSingleConnectionCheckout(t *testing.T) {
 			[]Grant{{Scope: f.org, Content: true}, {Scope: f.other, Content: true}},
 		),
 	)
+	// Configuration permission suffices: do not silently require message-content
+	// permission for an installation operator inspecting bounded storage metadata.
+	operator, err := f.service.PutUser(ctx, f.root.Token, "diagnostics", "test-diagnostics-secret", true)
+	check(t, err)
+	check(t, f.service.ReplaceGrants(ctx, f.root.Token, operator, []Grant{{Scope: "*", Content: false}}))
+	login, err := f.service.Login(ctx, "diagnostics", "test-diagnostics-secret")
+	check(t, err)
+	// Bound the inspections, not password hashing in fixture setup. A retained
+	// authorization checkout must still exhaust this one-connection pool's budget.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	tracer.armed.Store(true)
 	for _, token := range []string{"", manager.Token} {
 		snapshot, err := f.service.MemberStorage(ctx, token, member, "", 64)
@@ -140,13 +150,6 @@ func TestMemberStorageGlobalOnlyAndSingleConnectionCheckout(t *testing.T) {
 	if tracer.calls.Load() != 0 {
 		t.Fatal("unauthorized diagnostics entered storage authority before permission check")
 	}
-	// Configuration permission suffices: do not silently require message-content
-	// permission for an installation operator inspecting bounded storage metadata.
-	operator, err := f.service.PutUser(ctx, f.root.Token, "diagnostics", "test-diagnostics-secret", true)
-	check(t, err)
-	check(t, f.service.ReplaceGrants(ctx, f.root.Token, operator, []Grant{{Scope: "*", Content: false}}))
-	login, err := f.service.Login(ctx, "diagnostics", "test-diagnostics-secret")
-	check(t, err)
 	snapshot, err := f.service.MemberStorage(ctx, login.Token, member, "", 1)
 	check(t, err)
 	if snapshot.Member != member || snapshot.Current.FileID == "" || len(snapshot.Files) != 1 ||
