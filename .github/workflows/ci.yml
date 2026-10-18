@@ -23,6 +23,13 @@ jobs:
       GOMAXPROCS: '2'
       PYTHONDONTWRITEBYTECODE: '1'
       FRY_PROTO_BASE_REF: ${{ github.event.pull_request.base.sha || '' }}
+      # Keep cached inputs separate from test evidence and runner-preinstalled tools.
+      GOCACHE: ${{ github.workspace }}/.artifacts/cache/go-build
+      GOMODCACHE: ${{ github.workspace }}/.artifacts/cache/go-mod
+      npm_config_cache: ${{ github.workspace }}/.artifacts/cache/npm
+      GOLANGCI_LINT_CACHE: ${{ github.workspace }}/.artifacts/cache/lint
+      MISE_CONFIG_DIR: ${{ github.workspace }}/.artifacts/native-toolchain/config
+      MISE_SYSTEM_CONFIG_DIR: ${{ github.workspace }}/.artifacts/native-toolchain/system-config
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,8 +41,38 @@ jobs:
         with:
           version: '2026.10.13'
           sha256: '94c45523c7b6760b7da704f16051171ca32e8447a849a02266a439a4455e9a12'
-          install: false
-          cache: false
+          install: true
+          install_args: --locked
+          cache: true
+          cache_key_prefix: fry-mise-v1
+      - name: Restore dependencies
+        id: dependencies
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .artifacts/cache/go-mod
+            .artifacts/cache/npm
+            .artifacts/native-toolchain/x86_64/go-mod
+          key: fry-deps-v1-ubuntu24-${{ runner.arch }}-${{ hashFiles('mise.lock', 'go.mod', 'go.sum', 'third_party/**/go.mod', 'third_party/**/go.sum', 'tooling/**/go.mod', 'tooling/**/go.sum', 'tooling/rpc/package-lock.json', 'scripts/browser/package-lock.json') }}
+          restore-keys: |
+            fry-deps-v1-ubuntu24-${{ runner.arch }}-
+      - name: Cache builds
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .artifacts/cache/go-build
+            .artifacts/cache/lint
+          # Refresh immutable compilation caches after source changes; Go and
+          # golangci-lint validate restored entries against their actual inputs.
+          key: fry-build-v1-ubuntu24-${{ runner.arch }}-${{ hashFiles('mise.lock', 'tooling/native/**/go.mod', 'tooling/native/**/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            fry-build-v1-ubuntu24-${{ runner.arch }}-${{ hashFiles('mise.lock', 'tooling/native/**/go.mod', 'tooling/native/**/go.sum') }}-
+      - name: Restore Chromium
+        id: chromium
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .artifacts/browser/browsers
+          key: fry-chromium-v1-ubuntu24-${{ runner.arch }}-${{ hashFiles('scripts/browser/package-lock.json') }}
       - name: Setup tools
         run: make setup-tools doctor
       - name: Pull test images
@@ -44,6 +81,23 @@ jobs:
         run: make security-setup
       - name: Setup browser
         run: make browser-setup BROWSER_SETUP_FLAGS=--with-deps
+      # Save prepared downloads before tests so a test failure does not discard
+      # them. No credentials, service data, reports or pass markers are cached.
+      - name: Save dependencies
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .artifacts/cache/go-mod
+            .artifacts/cache/npm
+            .artifacts/native-toolchain/x86_64/go-mod
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
+      - name: Save Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .artifacts/browser/browsers
+          key: ${{ steps.chromium.outputs.cache-primary-key }}
       - name: Validate
         run: make check
       - name: Package container

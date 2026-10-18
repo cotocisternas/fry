@@ -262,6 +262,27 @@ credentials or production database are needed. After the CI validation suite, CI
 explicitly pulls the pinned distroless runtime, runs `make container` for amd64
 and checks the resulting executable with `-help`; it does not publish the image.
 
+CI restores mise installations, Go/npm downloads, Go/linter compilation caches
+and the pinned Chromium download between runs. Cache keys include the runner
+platform and relevant tool or dependency pins. Compilation caches refresh per
+commit and can reuse entries from earlier commits with the same toolchain;
+Go and the linter check the inputs of each reused entry. Dependency fallback
+caches remain subject to locked installs and checksum verification. Chromium
+uses an exact Playwright lockfile key. Prepared dependency and browser downloads
+are saved before validation, so a later test failure does not discard them.
+
+Setup and `doctor` still run on cache hits, as do all tests, race/coverage checks,
+generation checks and live security scans. Go tests use `-count=1`; cached test
+success is not a substitute for execution. Browser Linux libraries are installed
+on each fresh runner. Service data, credentials, security reports, coverage and
+success markers are never cached. Cache misses use the ordinary setup path.
+When adding a new CI tool or dependency, include its reusable downloads or build
+outputs in the appropriate cache and include its pins in that cache's key.
+Bump the relevant `fry-*-v1` prefix to invalidate a cache family. Cache hits and
+savings must be confirmed in hosted runs; local checks cannot prove a GitHub
+cache upload or restore. See the [cache action](https://github.com/actions/cache)
+and [mise action](https://github.com/jdx/mise-action) for the underlying behavior.
+
 `make check` orchestrates the existing-code checks, browser, security and
 protobuf checks through [`scripts/tests/check.sh`](../scripts/tests/check.sh).
 It includes strict formatting/lint, command builds,
