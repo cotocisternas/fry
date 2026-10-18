@@ -1,6 +1,6 @@
 """Disposable localhost administration demo with synthetic mail and credentials."""
 import argparse
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 import http.cookiejar
 import json
 import os
@@ -42,7 +42,7 @@ def demo_config(root, smtp_port, admin_port):
     return config
 
 
-def seed_demo(ports, config):
+def seed_demo(ports, config, *, announce=True):
     with smtplib.SMTP('127.0.0.1', ports['SMTP'], timeout=10) as smtp:
         for subject in SUBJECTS:
             smtp.sendmail('partner@example.net', ['invoices@example.test'],
@@ -63,12 +63,15 @@ def seed_demo(ports, config):
     post('organizations', {'id': config['routes'][0]['organization'],
                            'name': 'Example Logistics'}, who['csrf'])
     post('logout', {}, who['csrf'])
-    print(f'Disposable FRY demo: {origin}', flush=True)
-    print('Fixture login: operator / disposable-demo-admin', flush=True)
-    print('Ctrl-C removes all demo data.', flush=True)
+    if announce:
+        print(f'Disposable FRY demo: {origin}', flush=True)
+        print('Fixture login: operator / disposable-demo-admin', flush=True)
+        print('Ctrl-C removes all demo data.', flush=True)
 
 
-def run(admin_port):
+@contextmanager
+def installation(admin_port, *, announce=True):
+    """Own a seeded demo until the caller finishes; check all teardown paths."""
     with ExitStack() as resources:
         session = Session()
         resources.callback(session.close)
@@ -89,10 +92,15 @@ def run(admin_port):
         with logged_process([str(executable), '-init', '-config', str(config_path)],
                             log_path, env=environment, cwd=ROOT) as process:
             ports = listening_ports(process, log_path, ('SMTP', 'administration'), timeout=15)
-            seed_demo(ports, config)
-            status = process.wait()
-            if status:
-                raise RuntimeError(f'FRY demo exited with status {status}')
+            seed_demo(ports, config, announce=announce)
+            yield process, config
+
+
+def run(admin_port):
+    with installation(admin_port) as (process, _config):
+        status = process.wait()
+        if status:
+            raise RuntimeError(f'FRY demo exited with status {status}')
 
 
 def main(argv=None):

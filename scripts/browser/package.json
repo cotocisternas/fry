@@ -1,0 +1,9 @@
+{
+  "name": "fry-browser-checks",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Locked native Chromium dependencies for the disposable-demo regressions",
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

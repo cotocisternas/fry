@@ -96,11 +96,21 @@ case "$action" in
     "$repo_root/internal/admintransport/build-web.sh" check
     ;;
   sqlc-vet) "$repo_root/scripts/generate/sqlc.sh" vet ;;
-  test-browser) incomplete 'Required browser gate is not implemented in this tooling slice.' ;;
-  security) incomplete 'Required vulnerability, secret and static-security gate is not implemented; lint gosec alone is insufficient.' ;;
-  proto-check) incomplete 'Released API compatibility baseline is not established. Run proto-drift-check for schema lint, descriptor build and Go/TS/browser reproducibility; runtime interoperability is covered by the PostgreSQL suite.' ;;
-  check) incomplete 'Full PR gate is unavailable: browser, security, protobuf checks and reviewed coverage/behavior baseline are still required. Run individual local targets for partial evidence.' ;;
-  release-check) incomplete 'Release gate is unavailable: full PR gate, native amd64/arm64 evidence and release rehearsals are still required.' ;;
+  test-browser)
+    "$repo_root/scripts/browser/test.sh" "$@"
+    "$tool" exec python3 -m scripts.browser.lifecycle_test
+    ;;
+  security)
+    "$repo_root/scripts/security/test.sh"
+    "$repo_root/scripts/security/check.sh" "$@"
+    ;;
+  proto-check)
+    "$repo_root/scripts/quality.sh" proto-drift-check
+    "$repo_root/tooling/rpc/verify-compatibility.sh"
+    "$repo_root/scripts/generate/compatibility.sh"
+    ;;
+  check) "$repo_root/scripts/tests/check.sh" "$@" ;;
+  release-check) incomplete 'Release gate is unavailable: native amd64/arm64 qualification, release artifacts/provenance and load/failure rehearsals remain incomplete.' ;;
   help)
     echo 'make demo; make smoke SCENARIO=smtp (scripts/smoke.sh --help lists scenarios)'
     echo 'scripts/bench.sh --help (opt-in measurements)'
@@ -116,7 +126,8 @@ case "$action" in
     echo 'make proto-bootstrap proto-tools-check proto-drift-check (generation checks; not released API compatibility)'
     echo 'make test-image (alias for test-deps-build) coverage coverage-report'
     echo 'Native mise tools; Docker runs test dependencies only. TEST_FLAGS=-short for short suites.'
-    echo 'check/release-check/test-browser/security/proto-check fail until implemented.'
+    echo 'make browser-setup security-setup (explicit downloads for contributor checks)'
+    echo 'make check (complete contributor gate); make release-check remains unavailable.'
     ;;
   *) echo "Unknown quality action: $action" >&2; exit 2 ;;
 esac

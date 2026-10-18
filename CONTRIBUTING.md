@@ -6,6 +6,11 @@ commands, and the [code map](docs/code-map.md) to find the module you will chang
 Use the [glossary](GLOSSARY.md) and the relevant contract or validation record to
 understand the behavior callers already rely on.
 
+For a first contribution, follow the [clean setup](docs/development.md#setup),
+run `make doctor build generate-check`, then try `make demo` or
+`make smoke SCENARIO=smtp`. The [onboarding validation record](docs/validation/contributor-onboarding.md)
+identifies the committed source and host prerequisites actually exercised.
+
 ## Design for the next contributor
 
 A module's interface includes its ordering rules, ownership, cancellation and
@@ -112,8 +117,10 @@ Choose additional checks by the files and contracts involved:
 - SQL inputs: regenerate with `make sqlc`, then use `make sqlc-check sqlc-vet`
   and the owning module's PostgreSQL tests.
 - Protobuf or browser generator inputs: use `make generate` and
-  `make generate-check`. `make proto-drift-check` checks current schema and
-  generated-output drift; it does not prove compatibility with a released version.
+  `make generate-check`. `make proto-check` also checks protobuf compatibility
+  against the committed initial administration baseline and a PR base when
+  supplied. `make proto-drift-check` checks current schema and generated-output
+  drift alone. Neither establishes compatibility with an unrecorded release.
 - Mail-library patches: use `make test-forks TEST_FLAGS=-race`. The nested modules
   are outside root `./...`; transport changes should include their relevant suites.
 - Dependency-fixture changes: use `make test-deps-lint` and `make test-deps-test`,
@@ -127,10 +134,17 @@ Choose additional checks by the files and contracts involved:
 - Documentation-only changes: verify local links and command claims. Go lint and
   runtime tests do not validate prose.
 
+CI runs `make check` after explicit native setup and local dependency-image builds.
+Use it locally to reproduce the contributor gate; focused commands above provide
+faster, partial evidence while developing. It includes the existing-code baseline,
+browser, security and protobuf checks. See
+[CI and local verification](docs/development.md#ci-and-local-verification) for
+their prerequisites and artifacts. Report the commands, source commit, skipped
+prerequisites and any selection flags in the PR.
+
 `make baseline-check` reproduces the existing-code baseline when that full
-comparison is needed. It is not the complete future PR/release gate. Several
-broader gates deliberately fail until implemented; see
-[development tooling](docs/development.md#generation-and-tool-upgrades).
+comparison is needed. Release verification remains separate;
+`make release-check` reports its outstanding requirements explicitly.
 
 Daily work needs only the Make commands relevant to the change. Failure
 rehearsals and benchmarks are opt-in checks with different assertions, such as

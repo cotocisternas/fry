@@ -1,4 +1,5 @@
-// Run only against make demo's disposable synthetic installation.
+// scripts/browser/test.sh runs this against its own disposable demo.
+// Run directly only against make demo's disposable synthetic installation.
 // Supply PLAYWRIGHT_MODULE when Playwright is installed outside this repository.
 'use strict';
 const assert = require('node:assert/strict');
@@ -6,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const origin = process.env.FRY_DEMO_ORIGIN || 'http://127.0.0.1:8081';
 if (new URL(origin).hostname !== '127.0.0.1') throw new Error('Requires a loopback disposable demo');
 (async () => {
-  const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium'});
+  const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH});
   try {
     const page = await browser.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));

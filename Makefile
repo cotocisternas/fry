@@ -60,6 +60,13 @@ proto-generate:
 	./scripts/generate/proto.sh generate proto/admin gen/admin
 	./scripts/generate/proto.sh generate proto/member gen/member
 
+.PHONY: browser-setup security-setup
+browser-setup:
+	./scripts/browser/setup.sh $(BROWSER_SETUP_FLAGS)
+
+security-setup:
+	./scripts/security/setup.sh
+
 .PHONY: help fmt fmt-check lint lint-config build vet generate generate-check sqlc sqlc-check sqlc-vet test test-integration test-race test-forks coverage coverage-report test-image toolchain-versions test-browser security proto-check proto-drift-check check release-check
 
 help fmt fmt-check lint lint-config build vet generate generate-check sqlc sqlc-check sqlc-vet test-browser security proto-check proto-drift-check check release-check:

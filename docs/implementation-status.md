@@ -24,6 +24,14 @@ The [local repository preparation](validation/repository-initialization.md)
 records canonical module paths, source-only setup verification, subsequent tool
 and image remediation, and the remaining security limits.
 
+The private repository now lives at [cotocisternas/fry](https://github.com/cotocisternas/fry).
+The [contributor workflow](development.md#ci-and-local-verification) runs native
+quality, real PostgreSQL race/coverage, fork, browser, security and administration
+API compatibility checks through `make check`. The [onboarding record](validation/contributor-onboarding.md)
+and [browser runner record](validation/browser-ci.md) distinguish local evidence
+from hosted execution. Private branch protection is unavailable on the current
+GitHub plan, so checks cannot yet be enforced as merge requirements.
+
 ## Scope and remaining limits
 
 **This is a Linux prototype, not a production distributed deployment.** Members can run
@@ -281,8 +289,8 @@ references to distinguish implemented behavior from broader API designs.
 and rehearsals rerun in the tooling phase. The
 [Go quality policy](research/go-quality-policy.md) and
 [lint gap audit](research/lint-gap-audit.md) explain analyzer selection and gaps.
-These local baselines do not complete the broader browser, security,
-compatibility or release gates.
+These local records precede the contributor gate described above. Release
+qualification and production validation remain separate requirements.
 
 ## Run a local mail process
 

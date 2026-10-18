@@ -27,32 +27,43 @@ The small root command surface is:
   `lint`, `sqlc`, `buf`, `exec`, `receipts` and `versions`. Use Make for ordinary
   work; use this adapter for a focused native command.
 - [quality.sh](quality.sh): implement the root Make quality targets. Use
-  `make build`, `make fmt-check lint vet`, `make test-integration` or a focused
-  target from `make help`.
+  `make check` to reproduce the contributor CI gate, or `make build`,
+  `make fmt-check lint vet`, `make test-integration` and other focused targets
+  from `make help` while developing.
 - [test-deps.sh](test-deps.sh): build, identify, check and run disposable local
   test dependencies. Prefer `make test-deps-build`, `make test-deps-check`,
   `make test-deps-test` and `make test-deps-lint`; direct `image` and
   `run -- COMMAND ARGS` actions are described in the
   [fixture lifecycle reference](../tooling/testdeps/README.md).
+- [browser/setup.sh](browser/setup.sh) and [browser/test.sh](browser/test.sh):
+  `make browser-setup` explicitly installs locked Playwright/Chromium;
+  `make test-browser` runs both browser suites with a fresh disposable demo.
+- [security/setup.sh](security/setup.sh) and [security/check.sh](security/check.sh):
+  `make security-setup` source-builds the pinned scanners; `make security` runs
+  the contributor security gate.
 - [smoke.sh](smoke.sh): dispatch one explicit process or deployment rehearsal.
   Use `make smoke SCENARIO=...`, or the direct interface below.
 - [bench.sh](bench.sh): dispatch one opt-in measurement with
   `scripts/bench.sh CASE [args]`.
 
-Setup needs Linux amd64 or arm64, mise, Bash, Make and coreutils. Integration
-fixtures require Docker access and locally built dependency images. Python 3 is
-used by the demo and process harnesses; all smoke scenarios other than `smtp`
-also require OpenSSL. Kubernetes has additional prerequisites in its
+Setup needs the [host prerequisites](../docs/development.md#setup), including
+Linux amd64 or arm64, mise, Bash, Make, Python 3, OpenSSL and a C compiler.
+Integration fixtures require Docker access and locally source-built dependency
+images. Before the first image build, explicitly provision the digest-pinned
+Linux base as shown below. Kubernetes has additional prerequisites in its
 [profile README](../deploy/kubernetes/local/README.md).
 
 Normal tool selection does not install missing tools. Setup and explicit image
-builds may download pinned inputs. Smoke scenarios require their images to exist
+builds may download pinned inputs; the image builder requires its base already
+present. Smoke scenarios require their images to exist
 locally; the launcher does not build or pull images. Native process scenarios
 build temporary FRY test executables.
 
 ## Demo and smoke rehearsals
 
-```sh
+```bash
+source tooling/testdeps/images/pins.env
+docker pull "$FRY_TESTDEPS_BASE"
 make setup
 make doctor
 make demo
@@ -123,14 +134,18 @@ examples are in the [acceptance](../docs/validation/acceptance-profile.md),
   measurements and PostgreSQL query-plan reports. Invoke these explicitly with
   fresh output paths; they are separate from ordinary quality checks.
 - [browser/](browser/): focused browser regressions against the disposable demo.
-  These need a separately available Playwright/Chromium installation; they do
-  not implement the broader `make test-browser` gate.
+  `make browser-setup` prepares pinned Playwright/Chromium; `make test-browser`
+  owns the real demo, both suites and cleanup. The explicit setup option
+  `BROWSER_SETUP_FLAGS=--with-deps` also installs Linux libraries on supported
+  distributions; CI uses it on Ubuntu 24.04.
 - [generate/](generate/): SQL and protobuf generation adapters. Prefer
   `make generate`, `make generate-check`, `make sqlc` and `make proto-generate`.
 - [lib/](lib/): shared shell/Python toolchain and fixture lifecycle mechanics.
   These helpers are imported or sourced by their consumers.
 - [ops/](ops/): explicit operational probes, currently the opt-in AWS S3 probe
   described below.
+- [security/](security/): explicit scanner source builds and security checks,
+  using the pins and policy under `tooling/security`.
 - [smoke/](smoke/): scenario implementations. The public SMTP command remains
   `scripts/smoke.sh smtp`, backed by [smtp.py](smoke/smtp.py). The replica adapter
   is [replicas.sh](smoke/replicas.sh).
@@ -172,9 +187,11 @@ resources and is not part of setup, smoke or normal quality targets.
 
 `make test` may skip PostgreSQL cases; required integration targets need Docker
 and prepared local images. The existing-code baseline uses the short root race
-suite and complete fork race suites; it does not establish the full PR or
-release gate. `make check`, `make release-check`, `make test-browser`,
-`make security` and `make proto-check` still report their unimplemented gates.
+suite and complete fork race suites. `make check` adds the browser, security and
+protobuf compatibility checks used by contributor CI. See
+[CI and local verification](../docs/development.md#ci-and-local-verification)
+for the setup sequence and evidence limits. `make release-check` continues to
+report incomplete release requirements.
 
 Rehearsals use synthetic data and local failure domains. Their results do not
 establish production readiness, AWS/IAM behavior, independent disks or zones,

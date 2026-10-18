@@ -1,8 +1,9 @@
-// Run only against make demo's disposable synthetic installation:
+// scripts/browser/test.sh runs this against its own disposable demo.
+// Run directly only against make demo's disposable synthetic installation:
 // FRY_DEMO_HTTP_PORT=8081 make demo
 // FRY_DEMO_ORIGIN=http://127.0.0.1:8081 PLAYWRIGHT_MODULE=/path/to/playwright \
 //   node scripts/browser/member-storage.cjs
-// Requires an existing Playwright installation and Chromium; installs nothing.
+// Requires prepared Playwright/Chromium; scripts/browser/setup.sh installs them.
 // Real API calls check authorization. Browser routes supply deterministic edge
 // cases without changing storage metadata or claiming runtime failure coverage.
 'use strict';
@@ -81,7 +82,7 @@ async function rowValue(page, label, expected, title) {
 (async () => {
   const watchdog = setTimeout(() => { console.error('Member-storage UI regression exceeded 180 seconds'); process.exit(1); }, 180000);
   watchdog.unref();
-  const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium'});
+  const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH});
   try {
     const page = await browser.newPage(); page.setDefaultTimeout(10000); page.setDefaultNavigationTimeout(15000);
     const errors = []; page.on('pageerror', error => errors.push(error.message));

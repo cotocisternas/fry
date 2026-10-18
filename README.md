@@ -14,30 +14,40 @@ on-disk formats are experimental.
 
 ## Start locally
 
-Use Linux amd64 or arm64 with mise, Bash, Make, coreutils and access to a Docker
-daemon. The demo also needs Python; process rehearsals may need OpenSSL.
-See [development setup](docs/development.md#setup) for build prerequisites.
+Use Linux amd64 or arm64 with mise, Bash, Make, the host utilities, Python 3,
+OpenSSL, a C compiler and Docker access listed in
+[development setup](docs/development.md#setup). Access to the private GitHub
+repository is required to clone it.
 
-From the checkout:
+Run in Bash:
 
-```sh
-make setup
+```bash
+git clone https://github.com/cotocisternas/fry.git
+cd fry
+make setup-tools
+source tooling/testdeps/images/pins.env
+docker pull "$FRY_TESTDEPS_BASE"
+make test-deps-build
 make doctor
 make build
 make demo
 ```
 
-`make setup` installs the pinned native tools and builds FRY's PostgreSQL and
-Testcontainers cleanup-helper images locally from repository recipes. Explicit
-setup/build steps may download pinned sources and base images. Integration runs
-require those local images and fail if they are missing. Go builds, lint and
-generation run on the host; Docker supplies disposable dependencies.
+The explicit pull provisions the exact digest-pinned Linux base permitted by
+the repository recipe. PostgreSQL and the Testcontainers Ryuk cleanup helper are
+then built locally from pinned sources. `make setup` combines `setup-tools` and
+`test-deps-build` after that base is present. Setup/build steps download verified
+inputs; integration runs require the resulting local images and fail if they are
+missing. Go builds, lint and generation run on the host; Docker supplies disposable
+dependencies. Mise shell activation is optional.
 
 The demo starts a localhost installation with synthetic mail and prints its URL
 and fixture credentials. Ctrl-C removes its processes and data. For a manually
 configured SMTP/IMAP process, see the
 [local mail instructions](docs/implementation-status.md#run-a-local-mail-process)
 and [example configurations](examples/).
+See the [clean-clone onboarding record](docs/validation/contributor-onboarding.md)
+for executed commands, the baseline commit and the limits of that validation.
 
 ## Find your way around
 
@@ -67,6 +77,11 @@ behavior you change. Use `make help` to discover commands and the
 changes need the disposable integration runner. A clean lint result or a coverage
 percentage does not establish correctness.
 
+`make check` runs the contributor CI gate, including the existing-code baseline,
+browser regressions, security checks and protobuf compatibility. See
+[CI and local verification](docs/development.md#ci-and-local-verification) for
+prerequisites and the distinction between that gate and release validation.
+
 Daily work uses a few Make commands selected for the change. Benchmarks and
 failure rehearsals remain opt-in because they check different contracts; there
 is no requirement to run every script for each change.
@@ -80,9 +95,9 @@ shared NFS storage is unsupported. Actual AWS/IAM behavior, AZ-loss recovery,
 representative retained-data capacity and the 30-minute migration cutover target
 still need validation. No conversion of older prototype databases is supplied.
 
-The broader browser, security, compatibility and release gates remain unfinished;
-the corresponding Make targets report their gaps explicitly. See
-[development tooling](docs/development.md#generation-and-tool-upgrades) for details.
+`make release-check` remains unavailable while release and native arm64 execution
+evidence are incomplete. A successful contributor check does not establish the
+production and recovery guarantees above.
 
 [Implementation status and evidence](docs/implementation-status.md) groups the
 local validation records, experiments, rehearsals and their limits. These records

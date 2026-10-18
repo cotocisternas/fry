@@ -1,0 +1,3 @@
+title = "FRY tracked-source gate; exact exceptions are evaluated after scanning"
+[extend]
+useDefault = true

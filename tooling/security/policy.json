@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "source_scopes": [".", "third_party/go-imap", "third_party/go-smtp", "tooling/testdeps"],
+  "graph_scopes": [".", "third_party/go-imap", "third_party/go-smtp", "tooling/testdeps", "tooling/rpc/tools", "tooling/rpc/fixture", "tooling/security/scanners"],
+  "native_scopes": ["tooling/native/golangci-lint", "tooling/native/sqlc"],
+  "fork_versions": {
+    "github.com/emersion/go-imap/v2": "v2.0.0-beta.8",
+    "github.com/emersion/go-smtp": "v0.25.0"
+  },
+  "go_exceptions": [{
+    "advisory": "GO-2026-5932",
+    "module": "golang.org/x/crypto",
+    "version": "v0.58.0",
+    "package": "golang.org/x/crypto/openpgp",
+    "scopes": [".", "third_party/go-imap", "tooling/testdeps", "tooling/security/scanners"],
+    "reviewed": "2026-10-18",
+    "expires": "2026-11-18",
+    "reason": "Unmaintained OpenPGP subpackages have no fix and must remain absent from every dependency inventory, including tests. Package or symbol traces always fail.",
+    "evidence": "docs/validation/go-remediation-2026-10-18.md; https://pkg.go.dev/vuln/GO-2026-5932"
+  }],
+  "secret_exceptions": [{
+    "path": "third_party/go-imap/imapclient/client_test.go",
+    "rule": "private-key",
+    "sha256": "d37ceb3d5997cbf964837b49a2fd2e9ddca5915a1b292580ffd7a30ba163a879",
+    "reviewed": "2026-10-18",
+    "expires": "2027-01-18",
+    "reason": "Public upstream localhost TLS test key; only the exact detected key bytes at this test path qualify.",
+    "evidence": "https://github.com/emersion/go-imap/blob/7ac47a9cfd9a06ff5f3bdee52d7420137f023a1e/imapclient/client_test.go"
+  }, {
+    "path": "third_party/go-smtp/client_test.go",
+    "rule": "private-key",
+    "sha256": "c8e4848e8be311b7934286c971a693125961f2be0b21f4f4e6288206db93df15",
+    "reviewed": "2026-10-18",
+    "expires": "2027-01-18",
+    "reason": "Public upstream localhost TLS test key; only the exact detected key bytes at this test path qualify.",
+    "evidence": "https://github.com/emersion/go-smtp/blob/642c374442498d8e36bc67c27391b5700ac66b89/client_test.go"
+  }]
+}
