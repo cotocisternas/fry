@@ -11,6 +11,26 @@ run `make doctor build generate-check`, then try `make demo` or
 `make smoke SCENARIO=smtp`. The [onboarding validation record](docs/validation/contributor-onboarding.md)
 identifies the committed source and host prerequisites actually exercised.
 
+## Commit messages
+
+Use Conventional Commits: `type(scope): description`. The scope is optional;
+choose a short description of the actual change. Keep each commit focused on one
+coherent change.
+
+Use `feat` for new behavior, `fix` for product bug fixes, `refactor` for changes
+that preserve behavior, `test` for test changes, `build` for build and packaging
+changes, `ci` for CI workflows, `docs` for documentation, and `chore` for other
+maintenance. Mark breaking changes with `!` and explain them in a
+`BREAKING CHANGE:` footer.
+
+Examples:
+
+```text
+build(container): package native binaries in distroless
+test(admin): wait for asynchronous pool cleanup
+docs: document contributor setup
+```
+
 ## Design for the next contributor
 
 A module's interface includes its ordering rules, ownership, cancellation and
