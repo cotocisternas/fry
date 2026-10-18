@@ -157,11 +157,19 @@ func TestDirectoryListingCanceledPolicyWaitReleasesTransaction(t *testing.T) {
 		t.Fatalf("canceled listing = %v, rows = %+v", err, rows)
 	}
 	check(t, tx.Commit(t.Context()))
-	if acquired := f.db.Stat().AcquiredConns(); acquired != 0 {
-		t.Fatalf("canceled listing retained %d database connections", acquired)
-	}
-	// A subsequent request can use the pool and policy lock after cancellation.
 	ctx, stop := context.WithTimeout(t.Context(), 2*time.Second)
 	defer stop()
+	// pgx releases canceled connections by asynchronously destroying them. They
+	// remain acquired in pool statistics until network cleanup has completed.
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for acquired := f.db.Stat().AcquiredConns(); acquired != 0; acquired = f.db.Stat().AcquiredConns() {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("canceled listing retained %d database connections", acquired)
+		case <-tick.C:
+		}
+	}
+	// A subsequent request can use the pool and policy lock after cancellation.
 	check(t, f.service.PutOrganization(ctx, f.root.Token, Organization{ID: f.org, Name: "After canceled listing"}))
 }
