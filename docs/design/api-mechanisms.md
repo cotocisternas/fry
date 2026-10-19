@@ -1,10 +1,10 @@
 # API mechanism design
 
-Implementation authorization update, 2026-10-18: the user explicitly instructed
-“start the work.” The earlier design-only pause is superseded. Execute the
-accepted sequence, beginning with code quality and meaningful test baselines.
-Delegated work uses medium or high effort and standard execution only; no low,
-fast/priority, max or ultra modes.
+Implementation was authorized on 2026-10-18. This document records accepted
+requirements, including work not yet implemented. Use the
+[current implementation status](../implementation-status.md#current-engineering-status)
+and [administration API gap list](../reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+to distinguish those requirements from current behavior.
 
 Status: accepted as part of the consolidated design, 2026-10-18;
 implementation is authorized. See [API contract](api-contract.md).

@@ -1,15 +1,21 @@
 # Engineering foundation acceptance design
 
-Implementation authorization update, 2026-10-18: the user explicitly instructed
-“start the work.” The earlier design-only pause is superseded. Execute the
-accepted sequence, beginning with code quality and meaningful test baselines.
-Delegated work uses medium or high effort and standard execution only; no low,
-fast/priority, max or ultra modes.
+Implementation was authorized on 2026-10-18. This document records accepted
+requirements, including work not yet implemented. Use the
+[current implementation status](../implementation-status.md#current-engineering-status)
+and [administration API gap list](../reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+to distinguish those requirements from current behavior.
 
 Status: accepted as part of the consolidated design, 2026-10-18, including the
 command layout, test inventory and sequencing. Numerical limits remain subject
 to validation. Implementation is authorized; artifact publication remains subject
 to the agreed maintainer-triggered release workflow.
+
+The Linux amd64 contributor gate and container packaging have now
+[passed hosted CI](../validation/ci-recovery.md). This establishes the implemented
+checks, not every proposed behavior case below: retry/revision/jobs, service
+accounts and resumable downloads remain pending. Native arm64, release artifacts
+and production recovery/scale qualification remain separate gates.
 
 ## Accepted quality gates
 

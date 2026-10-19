@@ -1,6 +1,11 @@
 # API transport options
 
-Investigated 2026-10-18 against official documentation and source. Research informed the accepted [Connect decision](../adr/0023-use-connect-for-protobuf-rpc.md); implementation remains paused. Scope: protobuf administration APIs for the CLI and browser, plus authenticated member-to-member streaming. The user confirmed that RPC-style HTTP JSON is sufficient; REST resource URLs are not required. No implementation, installation, generation, builds, or performance measurements were performed. Exact dependency pins remain a later decision.
+Investigated 2026-10-18 against official documentation and source. Research informed the accepted [Connect decision](../adr/0023-use-connect-for-protobuf-rpc.md). Implementation was paused during this investigation; no implementation, installation, generation, builds, or performance measurements were performed as part of this research. Scope: protobuf administration APIs for the CLI and browser, plus authenticated member streaming. The user confirmed that RPC-style HTTP JSON is sufficient; REST resource URLs are not required.
+
+Connect administration and member gRPC were subsequently implemented with pinned
+native generators. Use the [administration](../reference/admin-rpc.md) and
+[member](../reference/member-rpc.md) references for current behavior and
+unimplemented mechanisms; this comparison remains the original research record.
 
 ## What each option provides
 

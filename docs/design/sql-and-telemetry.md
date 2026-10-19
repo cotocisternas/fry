@@ -5,20 +5,23 @@ recovery, throughput or production-readiness gates.
 
 ## SQL ownership
 
-PostgreSQL application statements live beside their owning modules:
+PostgreSQL application statements are centralized by domain under `db/queries`:
 
 - `db/queries/admin/queries.sql`: administration, authorization and auditing.
 - `db/queries/maildirectory/queries.sql`: incoming directory and credentials.
 - `db/queries/receiptstore/`: receipt authority, mailbox state and storage lifecycle.
 
-Each module has a `sqlc.yaml` and checked-in `dbgen` package using pgx/v5.
+The root [`sqlc.yaml`](../../sqlc.yaml) is the only generation configuration;
+it writes checked-in pgx/v5 `dbgen` packages under each owning module. Runtime
+schemas are centralized under `db/schema` and consumed by both installation and
+generation.
 Application interfaces retain validation, transactions, locks and domain errors;
 generated database types are not public API contracts. Schema installation and
 schema-ledger/catalog control retain their explicit SQL. Runtime schema DDL is
 unchanged by this refactor. The administration catalog stub is analysis-only;
 it is never installed in PostgreSQL.
 
-Use the digest-pinned sqlc 1.31.1 container through Make:
+Use the pinned native sqlc 1.31.1 binary through Make after `make setup-tools`:
 
 ```sh
 make sqlc        # regenerate checked-in Go code
@@ -26,18 +29,18 @@ make sqlc-check  # generate in a temporary tree and compare; never edits the sou
 make sqlc-vet    # sqlc vet hook (no extra policy rules configured yet)
 ```
 
-Docker and Make are sufficient for generation. The container runs as the caller,
-without network access or extra capabilities. Update the image version and digest
-together in `scripts/generate/sqlc.sh`. Edit SQL/configuration, not generated Go. After any
+Generation requires the [native development prerequisites](../development.md#setup),
+not Docker. The binary is built with the pinned Go compiler from the committed
+module graph under `tooling/native/sqlc`; `scripts/generate/sqlc.sh` selects it
+through the toolchain wrapper. Edit SQL/configuration, not generated Go. After any
 SQL change, regenerate and run the real-PostgreSQL tests: static generation does
 not prove runtime locks, query plans, null handling or atomicity.
 
-There are 402 receipt-storage queries, 71 administration queries and 28 directory
-queries. Generated methods serve typed writes, single rows and bounded lists. Unbounded
+Generated methods serve typed writes, single rows and bounded lists. Unbounded
 receipt-storage reads retain streaming adapters over sqlc-exported statements:
 they must close rows, check terminal errors and preserve cancellation. sqlc's
 usual `:many` method accumulates a complete slice and is unsuitable for those
-paths. There are 24 receipt-storage streaming call sites. One single-row owner snapshot
+paths. The single-row owner snapshot
 also retains an explicit scanner because sqlc 1.31.1 mis-infers nullable fields
 from its lateral join. These adapters are a deliberate limit to generated typing,
 not permission to add arbitrary inline application SQL. Transaction-local `SET`
@@ -81,8 +84,10 @@ budget and cannot change the durability result of completed mail operations.
 OpenTelemetry Go 1.47.0 exports traces and OTLP metrics. Current boundaries:
 
 - SMTP DATA receipt/submission and IMAP APPEND, FETCH and SEARCH.
-- Administration HTTP and authenticated storage-member HTTP.
-- Coordinator-to-member HTTP, including streamed response lifetime.
+- Administration HTTP, including Connect/gRPC requests at the HTTP boundary.
+- Authenticated member gRPC over HTTP/2 and coordinator-to-member HTTP transport,
+  including streamed response lifetime. These are HTTP transport observations,
+  not a complete per-method gRPC status/error instrumentation contract.
 - Queries on the process-owned pgx pool, including background work and migration.
 
 HTTP spans contain a fixed operation name, bounded method and status code, not
@@ -114,7 +119,7 @@ starts a local collector, verifies mail/submission/IMAP telemetry and checks tha
 synthetic message contents and credentials do not appear in its exports.
 
 ```sh
-go test -race ./internal/telemetry
+./scripts/toolchain.sh test-go test -race ./internal/telemetry
 ./scripts/tests/receipts.sh -race -short
 make sqlc-check sqlc-vet
 FRY_SMOKE_TELEMETRY=1 ./scripts/smoke.sh smtp

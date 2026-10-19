@@ -21,7 +21,7 @@ The small root command surface is:
 
 - [setup.sh](setup.sh): install the pinned native tools and prepare locked
   generator dependencies and module caches. `make setup-tools` runs this step;
-  `make setup` also builds local test dependency images.
+  `make setup` also pulls digest-pinned upstream test dependency images.
 - [doctor.sh](doctor.sh): check the prepared environment with `make doctor`.
 - [toolchain.sh](toolchain.sh): select prepared native tools for `go`, `test-go`,
   `lint`, `sqlc`, `buf`, `exec`, `receipts` and `versions`. Use Make for ordinary
@@ -74,8 +74,13 @@ make smoke SCENARIO=offline-restore
 # Explicit application image build before deployment rehearsals:
 make container IMAGE=fry:local-test
 make smoke SCENARIO=containers IMAGE=fry:local-test
-make smoke SCENARIO=kubernetes IMAGE=fry:local-test
 ```
+
+The pinned distroless base must be pulled explicitly before `make container`;
+see the [packaging prerequisites](../docs/validation/local-containers.md).
+The Kubernetes scenario is currently on a
+[security hold](../docs/validation/local-kubernetes.md) and exits before creating
+resources. It is not an available next step after building the image.
 
 `make demo` directly invokes [dev/demo_admin.py](dev/demo_admin.py) as
 `scripts.dev.demo_admin` through the repository toolchain. It starts a disposable
@@ -100,8 +105,8 @@ Its interface is `scripts/smoke.sh SCENARIO [IMAGE_TAG]`. Mail scenarios are
 
 Only `containers` and `kubernetes` accept `IMAGE_TAG`, which defaults to
 `fry:local-test`; other scenarios accept no positional arguments. The equivalent
-Make option is `IMAGE`. Kubernetes creates and removes a disposable local kind
-cluster. The [container validation](../docs/validation/container-runtime.md) and
+Make option is `IMAGE`. When its security hold is lifted, Kubernetes is intended
+to create and remove a disposable local kind cluster. The [container validation](../docs/validation/container-runtime.md) and
 [Kubernetes profile](../deploy/kubernetes/local/README.md) describe each rehearsal.
 
 ## Opt-in measurements

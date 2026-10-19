@@ -38,7 +38,11 @@ zero-finding result. Audit caches and raw scanner output remain local artifacts.
 - [Native tool remediation](native-tool-security.md): reproducible patched
   lint/sqlc builds, provenance checks and binary scans.
 - [Test-image remediation](image-remediation-2026-10-18.md): signed security
-  snapshots, current immutable image IDs, remaining OS findings and kind hold.
+  snapshots, then-current source-built image IDs, remaining OS findings and kind hold.
+
+The active fixture pins and their scan inventory are in
+[upstream test images](upstream-test-images.md); later integrated Linux amd64
+evidence is in [CI recovery](ci-recovery.md).
 
 All four freshly built native FRY executables were detected and scanned by
 Trivy 0.69.3 with zero matched vulnerabilities. The scan used the audit database

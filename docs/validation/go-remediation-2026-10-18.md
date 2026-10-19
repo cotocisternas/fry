@@ -1,5 +1,9 @@
 # Go dependency remediation — 2026-10-18
 
+This is the remediation-stage record. The later [upstream test-image validation](upstream-test-images.md)
+and [hosted CI run](ci-recovery.md) completed the real-PostgreSQL and integrated
+Linux amd64 checks that were still assigned to other owners below.
+
 The application and test-tool dependency upgrades are applied. Source rescans
 report no vulnerable symbols or imported vulnerable packages. Fresh OSV queries
 of all six selected module graphs leave one advisory family:
@@ -157,10 +161,10 @@ tests whose database-backed subtests skip. IMAP source tests exercised real
 pipe/TCP verified FETCH completion and UID validation; root preread unit tests
 also ran. The complete fork suites exercised malformed APPEND and SMTP
 DATA/BDAT framing. Database-backed root RPC, SMTP and IMAP cases were skipped
-because no PostgreSQL fixture was supplied. **The full
+because no PostgreSQL fixture was supplied. **At this remediation stage, the full
 root real-PostgreSQL `-race -short` run, including HTTP/2 RPC cases, and testdeps
-lifecycle tests remain with the parent/image owners after the new test images
-are ready.** This report does not represent those skipped cases as passing.
+lifecycle tests remained with the parent/image owners until the new test images
+were ready.** This report does not represent those skipped cases as passing.
 
 The initial focused invocation failed before tests in smtpserver, imapserver
 and admintransport: protobuf `filedesc.(*File).unmarshalSeed` panicked while

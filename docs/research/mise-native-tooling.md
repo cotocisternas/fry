@@ -108,11 +108,14 @@ pins have been removed by the parent/native integration work.
 
 ## Testcontainers and future dependencies
 
-Use native Go tests with shared Go fixture code around the official
-[Postgres module](https://golang.testcontainers.org/modules/postgres/), consuming
-the project's locally built, pinned PostgreSQL image. Keep unit tests independent
-of Docker; the required integration gate must fail when the daemon or required
-images are unavailable. Do not silently pull prebuilt service images.
+The original proposal used Testcontainers' PostgreSQL module and a locally built
+service image. The user clarified that FRY should own the fixture code, while
+using upstream service images. The implemented
+[fixture runner](../../tooling/testdeps/README.md) uses the generic Testcontainers
+Docker provider, FRY-owned readiness/cleanup and digest-pinned upstream PostgreSQL
+and Ryuk images. `make test-deps-pull` is the explicit download step; normal
+integration tests never pull. Unit tests remain independent of Docker, and
+required integration checks fail when the daemon or verified images are absent.
 
 Prefer one PostgreSQL instance/database per suite invocation and a unique schema
 per test. Existing helpers already use `CREATE SCHEMA` and connection
@@ -132,9 +135,9 @@ parent runner that starts the fixture, passes the DSN, waits for all test
 processes, and cleans up. A shared Testcontainers session ID groups resources,
 not application container instances.
 [Official session semantics](https://golang.testcontainers.org/features/test_session_semantics/).
-Use the official [Valkey module](https://golang.testcontainers.org/modules/valkey/)
-and the same lifecycle contract only when a feature actually requires Valkey;
-do not introduce speculative service dependencies.
+Valkey is not a current dependency. If needed later, add a digest-pinned upstream
+image and FRY-owned fixture with the same lifecycle contract. The earlier
+service-module recommendation is superseded; do not add speculative dependencies.
 
 ## Validation and remaining limits
 

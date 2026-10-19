@@ -104,6 +104,11 @@ Receiver names must be consistent across a type's methods. Handwritten Go has a
 120-column limit (tabs count as four), with automatic wrapping through `make fmt`.
 Integer-range loops are required where the conversion preserves behavior;
 loop-counter mutation and bounds that change during iteration require care.
+The enabled `modernize` analyzer also checks supported standard-library
+simplifications such as `bytes.Cut`, `SplitSeq`, `slices.Contains` and typed
+sorting. The [modernization record](validation/go-modernization.md) distinguishes
+these checks from GoLand-only inspections; a green linter does not mean every
+IDE suggestion is enforced.
 These rules apply to tests and the separate dependency-tooling module too.
 Duplication checks use a 100-token threshold. Review matches for shared meaning
 before extracting code: preserve transaction ownership, lock lifetimes and
@@ -204,6 +209,9 @@ They consume the same pinned upstream PostgreSQL image. Building a runtime image
 creating a local cluster or running a load rehearsal is an explicit action, not
 part of formatting or code generation. These checks do not provision AWS or
 establish multi-zone durability and production scale.
+The Kubernetes runner currently refuses execution under its
+[security hold](validation/local-kubernetes.md); historical kind results do not
+mean that the current scenario is runnable.
 
 ## Generation and tool upgrades
 
@@ -261,6 +269,10 @@ The runner explicitly pulls the pinned PostgreSQL and Ryuk images. No service
 credentials or production database are needed. After the CI validation suite, CI
 explicitly pulls the pinned distroless runtime, runs `make container` for amd64
 and checks the resulting executable with `-help`; it does not publish the image.
+The [successful run for `bcfd0e1`](https://github.com/cotocisternas/fry/actions/runs/39182056479)
+completed both validation and packaging. See the
+[CI recovery record](validation/ci-recovery.md) for the exact local and hosted
+evidence, including Docker-version compatibility and cache restoration.
 
 CI restores mise installations, Go/npm downloads, Go/linter compilation caches
 and the pinned Chromium download between runs. Cache keys include the runner
@@ -335,6 +347,9 @@ caches inside the checkout, followed by its packaging step:
   export GOMAXPROCS=2 FRY_TEST_STREAM=1 PYTHONDONTWRITEBYTECODE=1
   export GOCACHE="$PWD/.artifacts/cache/go-build" GOMODCACHE="$PWD/.artifacts/cache/go-mod"
   export npm_config_cache="$PWD/.artifacts/cache/npm" GOLANGCI_LINT_CACHE="$PWD/.artifacts/cache/lint"
+  export MISE_CONFIG_DIR="$PWD/.artifacts/native-toolchain/config"
+  export MISE_SYSTEM_CONFIG_DIR="$PWD/.artifacts/native-toolchain/system-config"
+  export FRY_PROTO_BASE_REF=  # for a PR, replace with its full base commit SHA
   make check
   runtime=$(awk '$1 == "FROM" {print $2}' Dockerfile)
   docker pull --platform linux/amd64 "$runtime"
@@ -344,6 +359,14 @@ caches inside the checkout, followed by its packaging step:
 ```
 
 For a pull request, also set `FRY_PROTO_BASE_REF` to the base commit, as CI does.
+Run this after the setup steps above with no test/package-selection overrides.
+Record Docker client and server versions with `docker version`: matching Go
+settings alone does not reproduce container CLI/API behavior. The image-inspect
+adapter checks support before passing `--platform` and always verifies the
+resolved image's Linux architecture. Testing an older CLI against a newer daemon
+is useful compatibility evidence, but does not reproduce an older daemon.
+On a suitable Linux host, `taskset -c <two-available-CPUs>` can also constrain
+execution; `GOMAXPROCS=2` alone limits Go parallelism, not other build tools.
 Cache location is part of the environment: Go resolves some patterns by
 directory, so a module cache inside the checkout can change what a check selects
 (see [coverage accounting](validation/coverage-accounting.md#profiles-containing-local-dependency-modules)).

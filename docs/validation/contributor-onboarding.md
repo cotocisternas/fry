@@ -6,7 +6,9 @@ That commit was subsequently reworded to follow Conventional Commits; its
 replacement is `a55d73a12a4c83c4b3e405f9871c8dd9faadaf04`, with an identical tree.
 The commands below passed in an independent local clone. The in-flight CI,
 browser, security and compatibility changes were not present in that commit;
-this record does not establish their integrated or hosted result.
+this record does not establish their integrated or hosted result. The later
+[hosted CI result](ci-recovery.md) establishes those Linux amd64 gates for its
+own commit.
 
 ## Fresh checkout and prerequisites
 
@@ -29,7 +31,7 @@ reused. Setup created this clone's native artifacts itself, including fresh
 source-built linter/sqlc outputs and locked npm dependencies. This is a fresh
 checkout test with warm host caches, not a clean-machine or offline installation.
 
-The same local Docker daemon already contained the exact current recipe images:
+The same local Docker daemon already contained these then-current recipe images:
 
 - `fry-testdeps-postgres:8d7dfdf808ddd5f1cbd3d537-amd64`
 - `fry-testdeps-ryuk:8d7dfdf808ddd5f1cbd3d537-amd64`
@@ -87,9 +89,10 @@ policy used by this earlier validation was superseded by the user’s clarificat
 the historical commands and results above are retained as executed. The CI validation suite adds
 `make security-setup`, `make browser-setup` and `make check`; hosted Ubuntu 24.04
 uses `make browser-setup BROWSER_SETUP_FLAGS=--with-deps` to install its Linux
-libraries explicitly. The integrated gate and GitHub Actions execution need
-their own result against the final committed source. A workflow definition or
-this earlier clone run does not establish that result.
+libraries explicitly. The integrated gate and GitHub Actions execution needed
+their own result against the final committed source; the later
+[CI recovery record](ci-recovery.md) supplies it for Linux amd64. This earlier
+clone run remains separate evidence.
 
 The administration compatibility guard deliberately uses an immutable initial
 development-source baseline from `tooling/rpc/admin-baseline.txt`, with an

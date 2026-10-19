@@ -22,7 +22,8 @@ Generated artifacts:
   `gen/admin/ts/fry/admin/v1/admin_pb.ts`. Use the descriptor with Connect-Web's
   `createClient`; it provides the typed client methods.
 
-Generation uses the existing pinned, offline tool image:
+After `make setup-tools`, generation uses the pinned native Go/Node/Buf tools
+and locally prepared generator dependencies:
 
 ```sh
 scripts/generate/proto.sh generate proto/admin gen/admin

@@ -84,6 +84,16 @@ is no requirement to run every script for each change.
 
 ## Current limits and evidence
 
+The [Build & test run for `bcfd0e1`](https://github.com/cotocisternas/fry/actions/runs/39182056479)
+passed full Linux amd64 validation and container packaging. The
+[CI recovery record](docs/validation/ci-recovery.md) records the exact revision,
+local/hosted environments and limits; it is not a production qualification.
+
+The implemented administration API still lacks several accepted foundations:
+service accounts, retry deduplication, resource revisions, durable jobs and
+resumable downloads. See the [complete API gap list](docs/reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+and the [current status table](docs/implementation-status.md#current-engineering-status).
+
 Metadata HA, automatic crash fencing/recovery, replica repair, complete IMAP
 compatibility and production-scale scheduling remain unimplemented or unvalidated.
 Two directories on one machine do not provide independent failure domains, and
