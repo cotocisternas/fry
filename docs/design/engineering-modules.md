@@ -1,10 +1,10 @@
 # Engineering module design
 
-Implementation authorization update, 2026-10-18: the user explicitly instructed
-“start the work.” The earlier design-only pause is superseded. Execute the
-accepted sequence, beginning with code quality and meaningful test baselines.
-Delegated work uses medium or high effort and standard execution only; no low,
-fast/priority, max or ultra modes.
+Implementation was authorized on 2026-10-18. This document records accepted
+requirements, including work not yet implemented. Use the
+[current implementation status](../implementation-status.md#current-engineering-status)
+and [administration API gap list](../reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+to distinguish those requirements from current behavior.
 
 Status: accepted as part of the consolidated design, 2026-10-18.
 Implementation is authorized. Numerical limits require validation.
@@ -13,15 +13,24 @@ accepted constraints and follows [the contract](api-contract.md) and
 [quality policy](../research/go-quality-policy.md). No code or schema changes
 are part of this document.
 
-## Concrete starting point
+## Original starting point and current layout
 
-`internal/admin` currently combines application operations, database queries,
+At design time, `internal/admin` combined application operations, database queries,
 HTTP routing, OIDC and embedded HTML/JavaScript. `cmd/fry` also owns listener,
 member transport and worker orchestration. `receiptstore` owns substantial durable
 mail behavior, while `maildirectory` owns routing and mail credentials. These
-are useful existing modules to deepen, not a reason to create a layer per table.
+were useful existing modules to deepen, not a reason to create a layer per table.
 The existing browser is embedded vanilla HTML/CSS/JavaScript; no SPA framework
 has been selected. sqlc output already exists in three module-local `dbgen`s.
+
+Transport extraction has since moved administration HTTP/OIDC and browser assets
+into `internal/admintransport`. The member gRPC handlers and clients currently
+live in `internal/receiptstore`, not the proposed `internal/membertransport`
+package below. SQL inputs and configuration are centralized under `db/` and the
+root `sqlc.yaml`, while generated types remain private to each owning module.
+Use the [code map](../code-map.md) for current paths. The table and mechanisms
+below remain design direction; retry/revision/job/service-account behavior is
+not implied by the transport extraction.
 
 ## Proposed responsibilities and dependency direction
 
@@ -29,7 +38,7 @@ Keep `cmd/fry`, `cmd/fry-member`, `cmd/fry-migrate` and `cmd/fry-admin` as the f
 process entry points. Commands parse configuration, construct explicit dependencies,
 start processes and own shutdown. They contain no permission, receipt or SQL rules.
 
-| Current location | Proposed responsibility and interface |
+| Location at design time | Proposed responsibility and interface |
 | --- | --- |
 | `internal/admin` application files | Administration module: named operations such as create credential, edit routing, inspect storage and submit maintenance. Own current action/scope/content authorization, revisions, audit and retry outcomes. Accept typed caller identity references and request values; return application values/errors, never transport or generated database values. |
 | `internal/admin/http.go`, `oidc.go`, embedded `web` | Move transport responsibilities into `internal/admintransport`; retain browser assets beside this adapter. Authenticate local/OIDC sessions and service tokens, enforce browser origin/CSRF, map Connect requests and errors, serve assets and original downloads. OIDC persistence remains behind administration operations. |

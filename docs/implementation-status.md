@@ -18,19 +18,43 @@ verification performed before expanding collaboration.
 The [2026-10-18 security audit](validation/security-audit-2026-10-18.md) records
 MIT licensing, secret-scan triage and the original dependency/image advisories.
 The [Go remediation record](validation/go-remediation-2026-10-18.md) documents
-updated dependencies and subsequent scans. These point-in-time checks do not
-complete the continuous security gate or establish production readiness.
+updated dependencies and subsequent scans. These point-in-time checks predate
+the continuous security gate now included in `make check`; they do not establish
+production readiness.
 The [local repository preparation](validation/repository-initialization.md)
 records canonical module paths, source-only setup verification, subsequent tool
 and image remediation, and the remaining security limits.
 
-The private repository now lives at [cotocisternas/fry](https://github.com/cotocisternas/fry).
+The public repository lives at [cotocisternas/fry](https://github.com/cotocisternas/fry).
 The [contributor workflow](development.md#ci-and-local-verification) runs native
 quality, real PostgreSQL race/coverage, fork, browser, security and administration
 API compatibility checks through `make check`. The [onboarding record](validation/contributor-onboarding.md)
 and [browser runner record](validation/browser-ci.md) distinguish local evidence
-from hosted execution. Private branch protection is unavailable on the current
-GitHub plan, so checks cannot yet be enforced as merge requirements.
+from hosted execution. After the public-visibility change, the active
+[main ruleset](https://github.com/cotocisternas/fry/rules/25366406) requires PRs
+and passing `CI`, with no bypass actors. See
+[repository protection](development.md#repository-protection).
+
+## Current engineering status
+
+The [hosted CI recovery record](validation/ci-recovery.md) identifies the
+successful full validation and container-packaging run at `bcfd0e1`, including
+the matching local checks and environment limits. It does
+not extend earlier storage, migration or Kubernetes rehearsals to that revision.
+
+| Area | Implemented and checked | Still pending |
+| --- | --- | --- |
+| Development and CI | Native mise tools, strict lint/format/modernization checks, centralized sqlc, generated RPC clients, PostgreSQL race/coverage tests, full mail-fork suites, browser and security gates; Linux amd64 hosted validation and packaging; PR-only main ruleset | Native arm64 execution and release qualification |
+| Administration | Typed Connect HTTP/JSON and gRPC, UI/CLI clients, local/OIDC human sessions, scoped authorization and audited full downloads | Service accounts, request deduplication, resource revisions, durable jobs, resumable downloads, complete cursor/error contracts; see the [API gap list](reference/admin-rpc.md#unavailable-foundations-and-compatibility) |
+| Observability | Optional process-owned OpenTelemetry traces/OTLP metrics and bounded instrumentation | Complete logging, readiness and operational metrics contracts; see [telemetry limits](design/sql-and-telemetry.md) |
+| Deployment and recovery | Local storage/process/container validation records and an opt-in AWS S3 probe | Real AWS/IAM execution, metadata HA, automatic crash recovery/fencing, replica repair, AZ-loss evidence, representative capacity and cutover validation |
+| Releases and security | Public repository, MIT license, source/security scans and explicit expiring exceptions | Maintainer-triggered release artifacts, SBOMs/provenance and native arm64 evidence; Kubernetes rehearsal remains on its [security hold](validation/local-kubernetes.md) |
+
+The targets for no accepted-mail loss and recovery within five minutes after
+an AZ failure, and a 30-minute migration cutover, remain requirements to prove.
+Optional filtering, quarantine, document routing and application delivery are
+later milestones under [ADR 0014](adr/0014-prove-conventional-email-first.md).
+This status table records gaps, not a new implementation plan.
 
 ## Scope and remaining limits
 
@@ -227,11 +251,11 @@ runtime evidence](validation/container-runtime.md) covers nonroot operation, rea
 roots, retained member volumes and conservative crash fencing. This does not provision
 AWS.
 
-Run `./scripts/smoke.sh kubernetes fry:local-test` to create and remove a disposable
-local kind cluster using that image. The [Kubernetes
-rehearsal](validation/local-kubernetes.md) verifies pod permissions, authenticated
-storage, exact mail retrieval and clean replacement on retained PVCs. Production EKS and
-availability-zone recovery remain separate validation gates.
+The [Kubernetes rehearsal](validation/local-kubernetes.md) is currently
+security-held: `./scripts/smoke.sh kubernetes fry:local-test` refuses execution
+before creating resources. Its historical run checked pod permissions,
+authenticated storage, exact mail retrieval and clean replacement on retained
+PVCs. Production EKS and availability-zone recovery remain separate gates.
 
 Run `./scripts/smoke.sh offline-restore` for the [offline hot-only restore
 rehearsal](validation/offline-restore.md): a stopped synthetic installation's full
@@ -252,15 +276,16 @@ AZ-recovery or production-capacity evidence.
 ## Engineering and native tooling
 
 Use the mise-managed native toolchain on Linux. Run `make setup` to install pinned tools
-and build FRY's test dependency images, then `make doctor`. See [development
+and pull digest-pinned upstream test dependency images, then `make doctor`. See [development
 tooling](development.md). Go 1.27.2 matches the root module requirement and runtime
 image build. The PostgreSQL and S3 adapters use pinned pgx v5 and AWS SDK for Go v2
 dependencies.
 
 Toolchain updates should select a verified stable release, update these pins together,
 and pass the root integration suite and both patched email-library suites. The nested
-library modules retain their upstream minimum Go declarations; run their tests with the
-same pinned compiler as FRY.
+library modules keep separate Go declarations (the IMAP fork's minimum was
+raised during dependency remediation); run their tests with the same pinned
+compiler as FRY.
 
 The agreed [engineering foundation](design/engineering-foundation.md) prioritizes code
 quality, linting and meaningful test coverage before release automation. Its broader

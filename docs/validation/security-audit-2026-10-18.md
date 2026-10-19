@@ -9,6 +9,8 @@ Subsequent fixes and validation are recorded in
 [repository preparation](repository-initialization.md), with links to the Go,
 native-tool and test-image remediation reports. The findings below preserve the
 original audit snapshot; they do not describe every dependency after remediation.
+The current fixture images are described in [upstream test images](upstream-test-images.md),
+and the current Linux amd64 gate result is in [CI recovery](ci-recovery.md).
 
 ## License
 
@@ -60,9 +62,9 @@ source files intended for the initial commit. The repository still needs its
 planned Git ignore policy before staging files. Reports retain findings rather
 than hiding them behind a passing aggregate status.
 
-## Current application dependencies
+## Application dependencies at audit time
 
-The root module selects `golang.org/x/net v0.59.0`. Govulncheck reports callable
+The root module then selected `golang.org/x/net v0.59.0`. Govulncheck reported callable
 HTTP/2 symbols for five advisories; each lists **v0.60.0** as the `x/net` fix:
 
 | Advisory | Issue |
@@ -78,8 +80,9 @@ demonstrations. FRY's Go **1.27.2** toolchain contains the corresponding
 standard-library fixes; upgrading Go alone does not update the separate
 `x/net` module.
 
-The root dependency must be upgraded and the RPC/protocol regression suites
-rerun as a separate remediation change. No version was changed in this audit.
+The audit required a separate upgrade and RPC/protocol regression run. No version
+was changed in this audit; the later [Go remediation](go-remediation-2026-10-18.md)
+records the upgrade and checks.
 
 ## Go modules and npm
 
@@ -134,10 +137,10 @@ replaced with scans that actually identified the binaries.
 
 | Artifact | Raw findings and interpretation |
 | --- | --- |
-| Current recipe-built PostgreSQL test image | 254 package findings representing 125 unique advisories, including four raw Critical and 16 unique High advisories. These are mostly OS-package findings, not PostgreSQL-core findings. |
-| Current recipe-built Ryuk helper | Four Docker-module matches. The advisories concern daemon components; inspected Ryuk uses client/API behavior, so these are not demonstrated Ryuk vulnerabilities. |
+| Then-current recipe-built PostgreSQL test image | 254 package findings representing 125 unique advisories, including four raw Critical and 16 unique High advisories. These are mostly OS-package findings, not PostgreSQL-core findings. |
+| Then-current recipe-built Ryuk helper | Four Docker-module matches. The advisories concern daemon components; inspected Ryuk uses client/API behavior, so these are not demonstrated Ryuk vulnerabilities. |
 | Available `fry:foundation-local` application image | Five unique `x/net` advisories repeated across three binaries. No exact equivalence with today's source is claimed. |
-| Three older FRY application images | Two unique `x/text` advisories per image, from embedded v0.29.0. Current root source selects v0.42.0; do not confuse those old artifacts with current selection. |
+| Three older FRY application images | Two unique `x/text` advisories per image, from embedded v0.29.0. The root source selected v0.42.0 at audit time; do not confuse those old artifacts with that source selection. |
 | Two older recipe-built test images | Repeat the PostgreSQL/Ryuk inventories; not additional distinct advisory sets. |
 | Native Go 1.27.2 (`go`, `gofmt`) | No matched advisory in those two detected binaries. |
 | Native golangci-lint 2.15.0 | 13 unique embedded-stdlib advisories; official artifact was built with Go 1.27.0. |
@@ -181,10 +184,11 @@ Detailed applicability evidence, primary sources and counts are in
 Unscanned scope includes build-stage base inventories, the full kind-node image,
 host Docker/OS dependencies, Node's native transitive libraries, and arm64
 artifacts. Advisory matching is not a complete source audit or proof of
-exploitability. The broad `make security` gate remains unfinished; these are
-explicit one-time scans.
+exploitability. At audit time the broad `make security` gate was unfinished;
+these were explicit one-time scans. The later [hosted CI run](ci-recovery.md)
+passed the integrated security gate.
 
-## Remediation order
+## Remediation order recorded at audit time
 
 1. Upgrade root `x/net` to at least v0.60.0 and run RPC/mail-protocol tests.
 2. Update affected test-tool dependencies, keeping module-only and uncertain

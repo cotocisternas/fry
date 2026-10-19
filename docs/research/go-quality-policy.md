@@ -5,11 +5,12 @@ across all existing FRY-owned handwritten code, with narrow documented exception
 The user also accepted required critical-behavior regressions plus a per-package
 coverage ratchet after initial baseline review. The user subsequently accepted
 the explicit lint/format policy below, including blocking findings with narrow
-documented exceptions. Exact tool artifacts and any repository-specific exceptions
-still require verification during adoption; the unresolved govulncheck pin is not
-implicitly accepted as latest stable.
+documented exceptions. The version investigation below records what was known
+at research time; current exact pins and reviewed security exceptions live in
+the committed tool manifests and [security policy](../../SECURITY.md).
 Implementation update, 2026-10-18: the user replaced the container toolchain with
-mise-managed native tools and locally built Testcontainers dependency images.
+mise-managed native tools. A subsequent clarification selected digest-pinned
+upstream service/helper images with FRY-owned Testcontainers fixture code.
 See [development tooling](../development.md) for the current workflow.
 The follow-up [lint gap audit](lint-gap-audit.md) records duplication findings and
 explicit recommendations for every disabled linter. The contributor-quality pass
@@ -220,7 +221,8 @@ Build all four commands for Linux amd64/arm64, and label execution evidence per
 architecture. [Race detection](https://go.dev/doc/articles/race_detector) supports
 both Linux targets but detects only executed races; cross-compilation supplies no
 runtime evidence. The local baseline is implemented and passing; native arm64
-execution and the remaining security/CI/release gates still require implementation.
+execution and release qualification remain pending. The current amd64 CI gate,
+including security checks, has [passed on the recorded revision](../validation/ci-recovery.md).
 
 ## Native CI architecture feasibility
 
@@ -231,5 +233,6 @@ native amd64/arm64 checks a feasible design option without requiring FRY's AWS
 account. The user selected native amd64 core race/PostgreSQL/fork checks on every
 PR and native arm64 runs of those suites before releases. Cross-compilation does
 not satisfy the arm64 release gate. Browser and architecture-independent checks
-need not be duplicated. No workflow has been created.
+need not be duplicated. The [current workflow](../../.github/workflows/ci.yml)
+runs the amd64 checks; native arm64 release execution is not yet implemented.
 [GitHub announcement, 2026-01-29](https://github.blog/changelog/2026-01-29-arm64-standard-runners-are-now-available-in-private-repositories/).

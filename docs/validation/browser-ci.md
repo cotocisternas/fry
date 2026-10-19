@@ -5,11 +5,12 @@ seeded native FRY executable and a disposable PostgreSQL fixture. It fails when
 either suite, startup, browser preflight or checked cleanup fails. It accepts no
 suite-selection arguments and never skips missing dependencies.
 
-From the repository root after native tool setup and the explicit local
-PostgreSQL/Ryuk image build:
+From the repository root after native tool setup and an explicit pull of the
+[pinned upstream PostgreSQL/Ryuk images](upstream-test-images.md):
 
 ```sh
 # Explicit download boundary. Ubuntu 24.04 amd64 CI also needs system libraries:
+make test-deps-pull
 ./scripts/browser/setup.sh --with-deps
 # On a prepared developer machine, omit --with-deps.
 ./scripts/browser/test.sh
@@ -20,8 +21,8 @@ The parent quality adapter can invoke `scripts/browser/test.sh` directly for
 with the optional `--with-deps` flag. Browser setup does not rerun native setup,
 build Docker images, start services or change the root toolchain fingerprint.
 The ordinary test command does not install tools, pull images or download
-modules (`GOPROXY=off`, `GOSUMDB=off`). Docker is used only through the existing
-owned-image PostgreSQL/Ryuk fixture runner. FRY, Node and Chromium run natively.
+modules (`GOPROXY=off`, `GOSUMDB=off`). Docker is used only through the FRY-owned
+PostgreSQL/Ryuk Testcontainers fixture runner. FRY, Node and Chromium run natively.
 
 ## Dependency ownership
 
@@ -90,8 +91,10 @@ actual runtime storage failures, production OIDC/TLS compatibility, other browse
 engines, cloud behavior or recovery guarantees. Neither suite's assertions were
 relaxed for integration.
 
-Validated locally on **2026-10-18**, Linux amd64, using the existing local owned
-dependency images and native pinned Chromium/Playwright above:
+Validated locally on **2026-10-18**, Linux amd64, using the then-present local
+dependency images and native pinned Chromium/Playwright above. The later
+[hosted CI run](ci-recovery.md) passed this browser gate with the upstream
+image pins.
 
 ```text
 scripts/browser/setup.sh                    PASS

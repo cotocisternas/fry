@@ -9,6 +9,12 @@ subset of `gocritic`, `makezero`, `nosprintfhostport`, begin-only `thelper`,
 `errname` and `predeclared`. The counts and catalog decisions below remain the
 pre-change audit record. Other candidates have not been enabled wholesale.
 
+The later [modernization pass](../validation/go-modernization.md) also enabled
+`modernize`, `copyloopvar`, `unconvert`, `asasalint`, `bidichk`, `durationcheck`
+and `gocheckcompilerdirectives`. Treat the disabled-linter catalog below as a
+historical snapshot; `.golangci.yml` and the current quality policy define the
+active checks.
+
 The previous green baseline established compliance with the configured policy.
 It did not establish that every useful analyzer was enabled, that duplication was
 absent, or that the program was defect-free. There are useful gaps. Keep an

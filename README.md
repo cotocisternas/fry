@@ -16,8 +16,8 @@ on-disk formats are experimental.
 
 Use Linux amd64 or arm64 with mise, Bash, Make, the host utilities, Python 3,
 OpenSSL, a C compiler and Docker access listed in
-[development setup](docs/development.md#setup). Access to the private GitHub
-repository is required to clone it.
+[development setup](docs/development.md#setup). The GitHub repository is public;
+cloning does not require repository credentials.
 
 Run in Bash:
 
@@ -77,12 +77,26 @@ percentage does not establish correctness.
 browser regressions, security checks and protobuf compatibility. See
 [CI and local verification](docs/development.md#ci-and-local-verification) for
 prerequisites and the distinction between that gate and release validation.
+Updates to `main` go through pull requests and the required `CI` check.
+Documentation-only changes use a small classification/check path; code changes
+still run the complete suite and container packaging. See
+[repository protection](docs/development.md#repository-protection).
 
 Daily work uses a few Make commands selected for the change. Benchmarks and
 failure rehearsals remain opt-in because they check different contracts; there
 is no requirement to run every script for each change.
 
 ## Current limits and evidence
+
+The [Build & test run for `bcfd0e1`](https://github.com/cotocisternas/fry/actions/runs/39182056479)
+passed full Linux amd64 validation and container packaging. The
+[CI recovery record](docs/validation/ci-recovery.md) records the exact revision,
+local/hosted environments and limits; it is not a production qualification.
+
+The implemented administration API still lacks several accepted foundations:
+service accounts, retry deduplication, resource revisions, durable jobs and
+resumable downloads. See the [complete API gap list](docs/reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+and the [current status table](docs/implementation-status.md#current-engineering-status).
 
 Metadata HA, automatic crash fencing/recovery, replica repair, complete IMAP
 compatibility and production-scale scheduling remain unimplemented or unvalidated.

@@ -28,7 +28,9 @@ On Linux amd64, the revised fixture passed:
 
 Parent command logs are local ignored evidence under
 `.artifacts/ci-setup/upstream-{smtp,offline-restore}.log`. They are not durable
-published artifacts. Hosted CI and runtime-image packaging have separate results.
+published artifacts. Hosted CI and runtime-image packaging passed later; see
+[CI recovery](ci-recovery.md).
+
 The Kubernetes security hold remains; these checks did not run Kubernetes,
 native arm64 or production workloads.
 

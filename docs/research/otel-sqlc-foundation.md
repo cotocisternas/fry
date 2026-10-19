@@ -78,11 +78,17 @@ Exact support for FRY's CTEs, row locks, SKIP LOCKED, ON CONFLICT, custom catalo
 
 ## Implementation findings
 
-FRY uses per-module `sqlc.yaml` files and a digest-pinned generator via
+The initial implementation used per-module `sqlc.yaml` files and a digest-pinned generator via
 `scripts/generate/sqlc.sh`. Actual PostgreSQL queries exposed inference limits around
 nullable comparisons, row-comparison parameters, computed booleans and lateral
 joins; explicit casts, named nullable arguments and result aliases resolve these.
 Streaming reads retain exported query constants and explicit scanners.
+
+The configuration and toolchain have since changed: the root
+[`sqlc.yaml`](../../sqlc.yaml) reads centralized schemas and queries under `db/`,
+and the script runs the pinned native sqlc binary prepared by `make setup-tools`.
+Generated `dbgen` packages still belong to their application modules. See the
+[current SQL workflow](../design/sql-and-telemetry.md#sql-ownership).
 
 Instrumentation uses the core SDK directly with narrow HTTP wrappers instead of
 `otelhttp`, avoiding automatic URL/header attributes. The SDK merges environment

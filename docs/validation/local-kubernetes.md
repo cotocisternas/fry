@@ -7,10 +7,12 @@ official kind release and registry currently publish no verified patched node
 digest. The former 1.37.0 image is no longer a runnable default. Restore `NODE`
 in `scripts/smoke/kubernetes.py` only after verifying an official patched digest
 and explicitly provisioning it locally; the rehearsal never pulls images.
-See [image remediation](image-remediation-2026-10-18.md) for the primary-source
-checks and Docker-free hold regression. The current database fixture is
-source-built PostgreSQL **18.6** on pinned Debian trixie main/security snapshots;
-its Docker readiness checks do not constitute a fresh Kubernetes rehearsal.
+See [image remediation](image-remediation-2026-10-18.md) for the recorded
+primary-source checks and Docker-free hold regression. The current database
+fixture uses the [digest-pinned upstream PostgreSQL image](../../tooling/testdeps/README.md)
+with FRY-owned Testcontainers lifecycle code. Its Docker readiness checks and
+the [hosted CI result](ci-recovery.md) do not constitute a fresh Kubernetes
+rehearsal.
 
 Commands and links use the current layout. Recorded results and hashes describe
 the original runs and source files, including any wrappers since removed.

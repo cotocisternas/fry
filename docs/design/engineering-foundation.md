@@ -1,10 +1,10 @@
 # Engineering foundation
 
-Implementation authorization update, 2026-10-18: the user explicitly instructed
-“start the work.” The earlier design-only pause is superseded. Execute the
-accepted sequence, beginning with code quality and meaningful test baselines.
-Delegated work uses medium or high effort and standard execution only; no low,
-fast/priority, max or ultra modes.
+Implementation was authorized on 2026-10-18. This document records accepted
+requirements, including work not yet implemented. Use the
+[current implementation status](../implementation-status.md#current-engineering-status)
+and [administration API gap list](../reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+to distinguish those requirements from current behavior.
 
 Status: consolidated design accepted and implementation authorized, 2026-10-18.
 Improve existing code and tests first, preserving atomic authorization, audit
@@ -24,13 +24,20 @@ Artifact publication still requires the agreed maintainer-triggered release.
   Pin exact versions and container digests; update related pins together. Record
   prerelease dependencies as explicit exceptions for review.
 - Tooling revision accepted 2026-10-18: mise manages pinned native tools and Make
-  remains the command interface. Testcontainers-Go owns disposable dependencies;
-  their service and cleanup-helper images are built locally from repository
-  recipes. Pinned Linux bases and verified build dependencies may be downloaded.
+  remains the command interface. FRY owns the Testcontainers-Go fixture code;
+  service and cleanup-helper images come from digest-pinned upstream releases
+  through an explicit pull. The earlier source-built-image interpretation was
+  superseded by the user's clarification. FRY application binaries are built
+  natively and copied into the pinned distroless runtime image.
   Ordinary builds, lint and generation do not use Docker. Docker remains for
   dependency services and explicit container/deployment rehearsals.
 
-## Planned implementation priority (after design approval)
+## Accepted implementation priorities
+
+This is the agreed sequence, not a checklist of unfinished work. Native tooling,
+the existing-code quality gate, typed Connect/member transports and Linux amd64
+CI are implemented. Service accounts, several API mechanisms, complete operational
+observability and release qualification remain pending; see the status links above.
 
 1. Measure package coverage and identify untested behavior. Establish strict
    formatting/lint/static checks and focused regression tests before structural
@@ -61,12 +68,13 @@ Artifact publication still requires the agreed maintainer-triggered release.
    Missing required prerequisites fail the gate. Add vulnerability scanning,
    secret detection and static security checks; high/critical findings block
    merges unless a reviewed exception records a rationale, owner and expiry.
-7. Prepare private, maintainer-triggered releases from an exact selected commit:
+7. Prepare maintainer-triggered releases from an exact selected commit:
    Linux binaries, multi-architecture images, checksums, SBOMs and signed build
    provenance. Expensive load and failure rehearsals are release gates.
 
-CI enforces these engineering standards throughout; it is not a substitute for
-improving the code and tests. Consequential refactors receive independent review.
+CI checks the implemented engineering standards; it is not a substitute for
+improving the code and tests. The repository is now public with a PR-only main
+ruleset and required `CI`. Consequential refactors receive independent review.
 
 ## Accepted code-quality baseline
 
@@ -95,8 +103,8 @@ golangci-lint with an explicit correctness, error-handling, context,
 resource-cleanup and security roster, plus gofumpt and goimports. Findings block
 the baseline unless a narrow exception is documented. Keep generic exclusion
 presets empty; repository-specific exceptions need explicit review. Verify exact
-tool artifacts and compatibility during adoption. These are requirements for
-future implementation, not permission to begin cleanup during design.
+tool artifacts and compatibility on upgrades. The existing-code cleanup and
+blocking checks have been implemented; the policy continues to apply to changes.
 
 ## Accepted native-test cadence
 
@@ -113,28 +121,33 @@ the exact release revision remain part of the detailed design.
 
 ## Repository and publication
 
-The agreed destination is `cotocisternas/fry`, private, with private artifacts
-and container images. GitHub Releases and GHCR are the proposed artifact stores.
+The original private-source requirement was superseded by the user's explicit
+public-visibility instruction. `cotocisternas/fry` is public and `main` requires
+PRs and passing CI without bypass actors. GitHub Releases and GHCR remain the
+proposed artifact stores; release visibility must be settled when that workflow
+is implemented, since GitHub Releases in this repository would be public.
 A maintainer selects a version and explicitly triggers publication after release
-checks. Scope agreement does not itself publish a release. Repository setup and
-remote enforcement remain implementation work, subject to actual account access
-and available GitHub features.
+checks. The visibility change does not publish a release. The repository,
+Actions workflow and branch rules are operational; release publication remains
+unimplemented.
 
 ## Separate production gates
 
 Metadata HA, trusted crash recovery/fencing, replica repair, degraded operation,
 representative throughput/retention scale, actual AWS behavior and AZ-loss
-validation remain separate work. AWS account/access is not yet available. Passing
+validation remain separate work. No AWS validation access or execution has been
+recorded. Passing
 this engineering foundation does not establish the production durability,
 availability, cutover or scale targets in the architecture brief.
 
-## Initial toolchain baseline
+## Historical initial toolchain baseline
 
 Go 1.27.2 was verified as the latest stable release on 2026-10-18 using the
 [official release history](https://go.dev/doc/devel/release). The local compiler
-and Docker build already used it; the root module minimum, `.go-version` and
-README now agree. Nested dependency modules retain upstream language minimums
-and are tested with the same compiler. The existing `go-imap/v2 v2.0.0-beta.8`
+and the then-current Docker build used it; the root module minimum and `.go-version`
+agreed. Current packaging builds binaries natively. Nested modules are tested
+with the same compiler; the IMAP fork's language minimum was subsequently raised
+during dependency remediation. The existing `go-imap/v2 v2.0.0-beta.8`
 dependency remains a prerelease requiring explicit stability review; this
 baseline does not claim every dependency has been updated or is stable.
 
@@ -151,8 +164,9 @@ regressions and independent review. Final validation with `GOTOOLCHAIN=local`:
   `/tmp/fry-go1272-imap-race.log` and `/tmp/fry-go1272-smtp-race.log`.
 - `go vet ./...` passed. Log: `/tmp/fry-go1272-vet.log`.
 
-These are local baseline checks, not the future CI/release gate or proof of
-production readiness. Temporary test database containers were removed.
+These were local baseline checks, not the later hosted CI result or proof of
+production readiness. Temporary test database containers were removed. See the
+[CI recovery record](../validation/ci-recovery.md) for the later tested revision.
 
 ## SQL and telemetry implementation
 
@@ -160,9 +174,9 @@ The user added sqlc and OpenTelemetry to this phase. The
 [SQL and telemetry design](sql-and-telemetry.md) records generated-query ownership,
 streaming exceptions, process configuration and privacy boundaries. sqlc 1.31.1
 and OpenTelemetry Go 1.47.0 were verified against upstream releases. This work
-adds real instrumentation and query generation; the gRPC contracts, broad lint
-baseline, CI/release workflows and remaining observability signals are still
-separate implementation work.
+adds real instrumentation and query generation. The gRPC contracts, broader lint
+gate and amd64 CI were subsequently implemented. Release workflows and the
+remaining observability signals are still separate work.
 
 [Local validation](../validation/sql-and-telemetry.md) passed for generated-code
 reproducibility, the complete short PostgreSQL race suite, both patched mail
@@ -189,9 +203,8 @@ The accepted consolidated design consists of:
 - [Go quality policy](../research/go-quality-policy.md): accepted lint/format
   roster and coverage accounting requirements.
 
-The module layout and command/test inventory are accepted; numerical protocol
-defaults remain provisional until validated. Exact compatible tool artifacts, generated-client
-packaging and per-method permission/recovery contracts must be resolved before
-their corresponding implementation steps. Coverage floors require measurement;
-they are not invented during design. Design acceptance is separate from an
-explicit subsequent instruction to begin implementation.
+The module layout and command/test inventory are accepted. Implemented tool pins,
+generated clients and coverage floors are recorded in the repository; proposed
+numerical defaults for unfinished API mechanisms still require validation.
+Per-method recovery contracts must be resolved before those mechanisms are
+implemented. This accepted design does not replace the current API references.

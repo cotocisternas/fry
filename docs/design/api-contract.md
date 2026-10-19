@@ -1,10 +1,10 @@
 # API contract design
 
-Implementation authorization update, 2026-10-18: the user explicitly instructed
-“start the work.” The earlier design-only pause is superseded. Execute the
-accepted sequence, beginning with code quality and meaningful test baselines.
-Delegated work uses medium or high effort and standard execution only; no low,
-fast/priority, max or ultra modes.
+Implementation was authorized on 2026-10-18. This document records accepted
+requirements, including work not yet implemented. Use the
+[current implementation status](../implementation-status.md#current-engineering-status)
+and [administration API gap list](../reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+to distinguish those requirements from current behavior.
 
 Status: consolidated design accepted and implementation authorized, 2026-10-18. Numerical limits in the companion mechanism design require
 validation. SMTP and IMAP remain the email protocols. The administration API
@@ -31,10 +31,10 @@ API/webhooks remain in their previously agreed later milestone.
 
 The first release provides versioned protobuf definitions, generated Go and
 TypeScript clients, and a readable RPC reference with examples. An OpenAPI
-specification is not required initially. These artifacts follow the previously
-agreed private repository/release policy; this scope decision does not authorize
-publication. The HTTP original-download contract must also be documented because
-it is not described by the RPC method definitions alone.
+specification is not required initially. Source visibility is now public by
+explicit user instruction; release publication still requires the agreed
+maintainer action and release checks. The HTTP original-download contract must
+also be documented because it is not described by the RPC method definitions alone.
 
 Exact packaging conventions remain to be specified. Generated
 code does not replace documentation of permissions, errors, retry IDs, revisions,

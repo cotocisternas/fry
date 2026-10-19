@@ -9,9 +9,11 @@ The accepted workflow uses mise-managed native Go, Node and Buf, plus locally
 source-built golangci-lint, sqlc and protobuf generators. The linter/sqlc security
 rebuild is recorded in [native-tool-security.md](native-tool-security.md).
 Docker remains for disposable service dependencies and
-explicit deployment rehearsals. PostgreSQL and the Testcontainers cleanup helper
-are built locally from pinned sources; explicit builds may download the pinned
-Linux base and verified build dependencies.
+explicit deployment rehearsals. The current fixture uses
+[digest-pinned upstream PostgreSQL and Ryuk images](upstream-test-images.md)
+with FRY-owned Testcontainers lifecycle code. The source-built images below
+belong to this earlier local validation, not the active setup. The later
+[hosted CI result](ci-recovery.md) validates the integrated Linux amd64 path.
 
 ## Completed evidence
 
@@ -79,3 +81,5 @@ The root baseline uses `-short`; it does not rerun the large-message cases
 recorded in the previous [RPC/complexity validation](sql-rpc-complexity.md).
 Container and Kubernetes deployment rehearsals were adapted to local image
 provenance and no-pull behavior, but were not rerun in this tooling slice.
+Container packaging subsequently passed in hosted CI; Kubernetes remains on
+its [security hold](local-kubernetes.md).

@@ -1,15 +1,21 @@
 # Engineering foundation acceptance design
 
-Implementation authorization update, 2026-10-18: the user explicitly instructed
-“start the work.” The earlier design-only pause is superseded. Execute the
-accepted sequence, beginning with code quality and meaningful test baselines.
-Delegated work uses medium or high effort and standard execution only; no low,
-fast/priority, max or ultra modes.
+Implementation was authorized on 2026-10-18. This document records accepted
+requirements, including work not yet implemented. Use the
+[current implementation status](../implementation-status.md#current-engineering-status)
+and [administration API gap list](../reference/admin-rpc.md#unavailable-foundations-and-compatibility)
+to distinguish those requirements from current behavior.
 
 Status: accepted as part of the consolidated design, 2026-10-18, including the
 command layout, test inventory and sequencing. Numerical limits remain subject
 to validation. Implementation is authorized; artifact publication remains subject
 to the agreed maintainer-triggered release workflow.
+
+The Linux amd64 contributor gate and container packaging have now
+[passed hosted CI](../validation/ci-recovery.md). This establishes the implemented
+checks, not every proposed behavior case below: retry/revision/jobs, service
+accounts and resumable downloads remain pending. Native arm64, release artifacts
+and production recovery/scale qualification remain separate gates.
 
 ## Accepted quality gates
 
@@ -104,12 +110,14 @@ budgets remain a proposed part of the detailed test plan, not an active schedule
    transaction, authorization, streaming and resource-ownership contracts.
 4. Introduce the accepted Connect/admin/internal contracts, service-account flows
    and transfer behavior, with relevant wire and integration cases.
-5. Enforce the agreed checks in private GitHub CI and prepare release workflows.
+5. Enforce the agreed checks in GitHub CI and prepare release workflows.
    Bind native amd64/arm64 results, generated-code checks and artifact provenance
    to the exact release revision and recorded dependency/tool inputs.
 
 The maintainer selects a version and explicitly triggers publication. Produce the
-agreed private Linux binaries and multi-architecture images, checksums, SBOMs and
-signed provenance. Passing foundation gates does not establish production HA or
-scale. Real AWS validation still requires account access and remains a separate
+agreed Linux binaries and multi-architecture images, checksums, SBOMs and
+signed provenance. The source repository is now public; artifact visibility must
+be explicit when the release workflow is implemented. Passing foundation gates
+does not establish production HA or scale. Real AWS validation still requires
+account access and remains a separate
 gate; local synthetic fixtures must not be described as AWS validation.

@@ -5,6 +5,10 @@ receiver-name differences, long lines and counted loops that could use integer
 range. This change strengthens the handwritten-code policy and cleans its
 existing findings.
 
+The source-built PostgreSQL fixture described in the local result below is
+historical. Current setup uses [upstream test images](upstream-test-images.md),
+and the broader Linux amd64 checks passed in [hosted CI](ci-recovery.md).
+
 ## Policy
 
 - Revive's `receiver-naming` rule requires consistent receiver names.

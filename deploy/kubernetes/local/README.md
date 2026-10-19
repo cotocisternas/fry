@@ -1,6 +1,13 @@
 # Disposable local kind profile
 
-Run from the repository root only after `fry:local-test` passes
+**Security hold, 2026-10-18:** `scripts/smoke/kubernetes.py` has no runnable
+node pin and exits before creating resources. The historical Kubernetes 1.37.0
+node is not a valid default. See the [validation status](../../../docs/validation/local-kubernetes.md)
+for the hold; do not treat the container or hosted CI result as a Kubernetes
+rehearsal.
+
+After an official patched node digest is verified and provisioned locally,
+run from the repository root only after `fry:local-test` passes
 `scripts/smoke.sh containers`:
 
 ```sh

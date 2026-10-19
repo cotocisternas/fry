@@ -8,6 +8,9 @@ repository-built PostgreSQL 18.6 fixture. This pass improves maintainability and
 behavioral evidence before introducing more contributors. It does not establish
 production readiness or complete the engineering foundation.
 
+The fixture image and scope are historical; [upstream test images](upstream-test-images.md)
+and the [hosted CI result](ci-recovery.md) record the later integrated path.
+
 ## Changes and preserved contracts
 
 - Current-file and sealed-file reclamation share one bounded record-copy

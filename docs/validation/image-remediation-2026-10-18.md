@@ -62,7 +62,7 @@ once, with exactly one successful build per image. Both tags use recipe
 Trivy **0.69.3** downloaded a new dedicated database into this remediation's
 `cache/`, rather than using the shared cache or the original audit cache. Schema
 2 metadata records `UpdatedAt=2026-10-18T13:11:41.355239553Z` and
-`DownloadedAt=2026-10-18T17:22:05.716074226Z`. Both current images were scanned
+`DownloadedAt=2026-10-18T17:22:05.716074226Z`. Both then-current images were scanned
 by full immutable ID using Docker-only image discovery, vulnerability scanning,
 offline analysis, no database refresh during scans, and `/dev/null` as the
 ignore file. No severity or unfixed-finding filter was applied. Scan exit 0

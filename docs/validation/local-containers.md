@@ -170,5 +170,6 @@ selection are covered by deterministic Docker-free regressions.
 
 This verifies old-CLI/new-daemon compatibility, not a full Docker 28 daemon or
 arm64 runtime. No daemon configuration, unrelated image/container, or cache was
-changed. Independent review and the complete final-tree `make check` plus
-container path remain separate required parent gates before pushing.
+changed. The later matching-tree local checks and successful hosted packaging
+are recorded in [CI recovery](ci-recovery.md); they completed the parent gates
+that were still pending when this repair was recorded.

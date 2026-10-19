@@ -5,10 +5,16 @@ tagged source and official documentation. Read alongside
 [transport research](api-transport-options.md), [API contract](../design/api-contract.md)
 and [implemented telemetry policy](../design/sql-and-telemetry.md).
 
-This is research only. No dependencies were installed, generators executed,
+This is a historical research record. The repository now has Git history,
+implemented Connect/gRPC transports and native generation. See the
+[RPC tooling reference](../../tooling/rpc/README.md) and
+[CI recovery record](../validation/ci-recovery.md) for the later workflow and
+validation; the snapshot findings below are not its current implementation status.
+
+During this research, no dependencies were installed, generators executed,
 application/tooling files changed, or artifacts published. Compatibility is
 supported by dependency declarations and inspected APIs; it is **not a compiled
-or end-to-end tested compatibility claim**. The source snapshot has no `.git`
+or end-to-end tested compatibility claim**. The inspected source snapshot had no `.git`
 metadata, so no FRY commit ID can be asserted. The existing coverage manifest
 `.artifacts/foundation/source.sha256` has SHA-256
 `e7ebfef4e58b822bf861893c2a4b71a86a4aa5f1a6a61523d25fe457f0dfd0a6`;

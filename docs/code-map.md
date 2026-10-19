@@ -100,8 +100,8 @@ context, error and resource ownership principles.
 
 [`Makefile`](../Makefile) dispatches to the [script launchers](../scripts/README.md)
 and the pinned native toolchain in [`mise.toml`](../mise.toml) / [`mise.lock`](../mise.lock).
-[`tooling/testdeps`](../tooling/testdeps/) is a separate Go module that builds
-dependency images and owns disposable fixture lifetimes;
+[`tooling/testdeps`](../tooling/testdeps/) is a separate Go module that verifies
+digest-pinned upstream images and owns disposable fixture lifetimes;
 [`internal/testutil`](../internal/testutil/) contains application test helpers.
 See [development tooling](development.md) for check selection and setup.
 

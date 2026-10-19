@@ -92,6 +92,14 @@ marker takes precedence over joined Connect errors, cancellation, deadlines,
 conflict, stale-owner and busy errors; none may authorize replica fallback or
 parent-pin cleanup while descriptor closure remains unproven.
 
+Read registration checks cancellation before sending its database COMMIT. Once
+COMMIT is sent, it has a separate five-second settlement budget so request or
+ownership cancellation cannot discard a successful registration acknowledgement.
+A known committed registration still requires cleanup and closure proof;
+genuinely uncertain outcomes retain debt. The [CI recovery record](../validation/ci-recovery.md)
+links the regression and tested revision. This does not provide automatic crash
+takeover or eliminate uncertainty after an unavailable database.
+
 Calls have the configured 1 second–5 minute budget. Admission bounds active calls
 and raw TLS connections; excess calls fail `RESOURCE_EXHAUSTED`. HTTP/2 also
 limits concurrent streams per connection to the configured request budget, with

@@ -4,13 +4,18 @@ Existing-code baseline passed, 2026-10-18. This records the existing-code qualit
 accepted module and RPC changes. It is not production-readiness or AWS evidence.
 The later central-SQL, RPC and complexity work has a separate
 [validation record](sql-rpc-complexity.md); results below describe this earlier baseline.
+Current native tooling, upstream test images and the completed Linux amd64
+`make check`/packaging run are recorded in [native tooling](native-tooling.md),
+[upstream test images](upstream-test-images.md) and [CI recovery](ci-recovery.md).
 The full engineering gates are specified in
 [the acceptance design](../design/engineering-acceptance.md).
 
 ## Tooling and scope
 
-The [reference workflow](../development.md) pins Go 1.27.2, Node 26.12.0 and
-golangci-lint 2.15.0 in digest-pinned containers. The explicit linter roster applies
+At this baseline's date, the workflow pinned Go 1.27.2, Node 26.12.0 and
+golangci-lint 2.15.0 in digest-pinned containers. The current
+[reference workflow](../development.md) uses native mise-managed tools. The
+explicit linter roster applies
 to handwritten FRY commands, packages and tests. Generated code retains build,
 generation, security and integration obligations. The two patched mail modules
 run separate test suites; root-module tests do not include them.
@@ -152,9 +157,10 @@ policy is covered by `TestMemberFilesFreshCatalogInsertFailureRollsBackBinding`;
 the new cancellation-during-scan case covers reopening an already registered
 member. Automatic recovery of an unregistered fresh directory is not claimed.
 
-Browser, security and protobuf gates explicitly fail as incomplete until their
-implementations exist. Native arm64 execution and real AWS validation have not
-been established by these Linux amd64 local checks.
+At this baseline's date, browser, security and protobuf gates still failed as
+incomplete. They subsequently passed in the [hosted CI run](ci-recovery.md).
+Native arm64 execution and real AWS validation have not been established by
+these Linux amd64 checks.
 
 ## Enforced baseline and behavior inventory
 
@@ -163,8 +169,9 @@ with PostgreSQL and Node (`-short`), complete patched-library race suites withou
 `-short`, lint, formatting, vet, command builds and sqlc reproduction/query checks.
 It refuses test selection and floor/output overrides, and compares source
 snapshots before and after execution. Only a successful unchanged-source run
-writes `.artifacts/baseline-check/PASSED`. This existing-code gate does not replace
-the broader unfinished `make check` or release gate. `make coverage` and
+writes `.artifacts/baseline-check/PASSED`. This existing-code gate did not replace
+the broader `make check` or release gate at the time; `make check` later passed
+in [hosted CI](ci-recovery.md). `make coverage` and
 `make coverage-report` also use the reviewed floors by default.
 
 The first end-to-end invocation passed all core tests but failed the new floors:
@@ -210,14 +217,17 @@ tests. Do not lower them automatically. New packages, package moves and changed
 accounting require explicit review; preserve the cases above when moving code.
 Review and raise floors after meaningful added behavior coverage.
 
-Priority refactor prerequisites remain: real installation/schema-refusal tests
-before storage creation; member startup failure and SIGTERM cleanup; migration
-stale activation and output failure after committed actions; replica trust and
-directory failures and releasing the first member if the second fails to open.
-The load tool needs a tiny SMTP-to-IMAP round trip, cancellation and integrity
-mismatch case. Add these before changing the corresponding module responsibilities.
-Future API retry/revision/cancellation/resume, service-account, browser, security,
-native arm64, large-message and HA/scale cases remain later explicit gates.
+At this baseline's date, priority refactor prerequisites were real
+installation/schema-refusal tests before storage creation; member startup
+failure and SIGTERM cleanup; migration stale activation and output failure
+after committed actions; replica trust and directory failures; and releasing
+the first member if the second failed to open. The load tool needed a tiny
+SMTP-to-IMAP round trip, cancellation and integrity mismatch case before
+changing the corresponding module responsibilities.
+At this baseline's date, API retry/revision/cancellation/resume, service-account,
+browser, security, native arm64, large-message and HA/scale cases remained later
+explicit gates. Browser and security subsequently passed in
+[Linux amd64 CI](ci-recovery.md); the other gates have their own scope and evidence.
 
 ## Refactor follow-up evidence
 
