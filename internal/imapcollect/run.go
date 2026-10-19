@@ -6,21 +6,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"io"
 	"strings"
 
 	"github.com/cotocisternas/fry/internal/hotstore"
+	"github.com/cotocisternas/fry/internal/imapsource"
 	"github.com/cotocisternas/fry/internal/receiptstore"
 
 	"github.com/emersion/go-imap/v2"
-	"github.com/emersion/go-imap/v2/imapclient"
 )
 
 type collectionRun struct {
-	collector *Collector
-	client    *imapclient.Client
-	conn      net.Conn
-	result    Result
+	collector     *Collector
+	reader        *imapsource.CollectionReader
+	sourceCleanup *imapsource.Cleanup
+	result        Result
 }
 
 func (r *collectionRun) collectMappings(ctx context.Context) error {
@@ -38,7 +38,7 @@ func (r *collectionRun) collectMappings(ctx context.Context) error {
 		if !exists {
 			return fmt.Errorf("imapcollect: destination folder must already exist")
 		}
-		selected, err := r.client.Select(mapping.SourceFolder, &imap.SelectOptions{ReadOnly: !cfg.DeleteSource}).Wait()
+		selected, err := r.reader.Select(mapping.SourceFolder)
 		if err != nil {
 			return fmt.Errorf("imapcollect: cannot select source folder")
 		}
@@ -63,11 +63,7 @@ func (r *collectionRun) collectFolder(
 	source receiptstore.Source,
 	target receiptstore.ID,
 ) (bool, error) {
-	search, err := r.client.UIDSearch(&imap.SearchCriteria{}, nil).Wait()
-	if err != nil {
-		return false, fmt.Errorf("imapcollect: source search failed")
-	}
-	uids, err := boundedUIDs(search)
+	uids, err := r.reader.Search()
 	if err != nil {
 		return false, err
 	}
@@ -121,10 +117,10 @@ func (r *collectionRun) collectMessage(
 	}
 	if accepted {
 		r.result.AlreadyPresent++
-		return r.cleanup(ctx, uid, attempt)
+		return r.cleanup(ctx, source, attempt)
 	}
 
-	metadata, found, err := r.metadata(uid)
+	metadata, found, err := r.reader.Metadata(uint32(uid))
 	if err != nil {
 		return err
 	}
@@ -139,7 +135,11 @@ func (r *collectionRun) collectMessage(
 		}
 		envelope = r.envelope(source, target, metadata)
 	}
-	copied, err := c.copyLiteral(ctx, r.client, r.conn, uid, metadata.RFC822Size, attempt, envelope)
+	copied, err := r.reader.Fetch(
+		uint32(uid),
+		metadata.Size,
+		func(body io.ReadCloser) error { return c.acceptLiteral(ctx, attempt, envelope, body) },
+	)
 	if err != nil {
 		return err
 	}
@@ -148,39 +148,19 @@ func (r *collectionRun) collectMessage(
 		return nil
 	}
 	r.result.Copied++
-	return r.cleanup(ctx, uid, attempt)
-}
-
-func (r *collectionRun) metadata(uid imap.UID) (*imapclient.FetchMessageBuffer, bool, error) {
-	messages, err := r.client.Fetch(
-		imap.UIDSetNum(uid),
-		&imap.FetchOptions{UID: true, Flags: true, InternalDate: true, RFC822Size: true},
-	).
-		Collect()
-	if err != nil {
-		return nil, false, fmt.Errorf("imapcollect: metadata fetch failed")
-	}
-	if len(messages) == 0 {
-		return nil, false, nil
-	}
-	if len(messages) != 1 || messages[0].UID != uid || messages[0].RFC822Size < 0 ||
-		messages[0].RFC822Size > r.collector.config.MaxMessageBytes {
-		return nil, false, fmt.Errorf("imapcollect: invalid or oversized source message")
-	}
-	return messages[0], true, nil
+	return r.cleanup(ctx, source, attempt)
 }
 
 func (r *collectionRun) envelope(
 	source receiptstore.Source,
 	target receiptstore.ID,
-	m *imapclient.FetchMessageBuffer,
+	m imapsource.Metadata,
 ) receiptstore.Envelope {
 	cfg := r.collector.config
 	flags := []string{}
 	for _, flag := range m.Flags {
-		value := string(flag)
-		if collectionFlag(value) {
-			flags = append(flags, value)
+		if collectionFlag(flag) {
+			flags = append(flags, flag)
 		}
 	}
 	return receiptstore.Envelope{
@@ -205,11 +185,11 @@ func collectionFlag(value string) bool {
 		value == string(imap.FlagDeleted)
 }
 
-func (r *collectionRun) cleanup(ctx context.Context, uid imap.UID, attempt receiptstore.ID) error {
+func (r *collectionRun) cleanup(ctx context.Context, source receiptstore.Source, attempt receiptstore.ID) error {
 	if !r.collector.config.DeleteSource {
 		return nil
 	}
-	if err := r.collector.cleanup(ctx, r.client, uid, attempt); err != nil {
+	if err := r.collector.cleanup(ctx, r.sourceCleanup, source, attempt); err != nil {
 		return err
 	}
 	r.result.Cleaned++
