@@ -10,17 +10,14 @@ import tempfile
 import uuid
 
 from prepare import BINARIES, MODULE, verify_elf
-
-
-def docker(*arguments, timeout=30):
-    return subprocess.check_output(['docker', *arguments], text=True, timeout=timeout)
+from image_inspect import docker, inspect_image
 
 
 def check(image, arch):
     if arch not in ('amd64', 'arm64'):
         raise ValueError('architecture must be amd64 or arm64')
     # Resolve the local immutable image first; subsequent commands never pull it.
-    inspection = json.loads(docker('image', 'inspect', '--platform', f'linux/{arch}', image))[0]
+    inspection = inspect_image(image, arch, command=docker)
     # Docker's containerd store can report a platform manifest as Id when
     # --platform is used; container creation resolves the local index identity.
     identity = json.loads(docker('image', 'inspect', image))[0]['Id']
@@ -104,4 +101,5 @@ if __name__ == '__main__':
             raise ValueError('usage: check.py LOCAL_IMAGE amd64|arm64')
         check(sys.argv[1], sys.argv[2])
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
-        sys.exit(f'container check: {error}')
+        detail = getattr(error, 'stderr', None) or str(error)
+        sys.exit(f'container check: {detail.strip()}')

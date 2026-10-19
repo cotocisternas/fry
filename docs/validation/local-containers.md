@@ -20,12 +20,23 @@ python3 tooling/container/check.py fry:local-test amd64
 Use `arm64` in all three commands to package that architecture. An omitted
 `ARCH` selects the native host architecture; an omitted `IMAGE` selects
 `fry:local-test`. The host must be Linux amd64 or arm64, with Docker, Python 3,
-GNU `timeout`, mise, and the pinned Go installation available. Docker must support
-platform-specific local image inspection. Cross-compilation uses native Go;
+GNU `timeout`, mise, and the pinned Go installation available. Packaging supports
+Docker 28.0.4's local inspection as well as newer platform-selected inspection.
+Cross-compilation uses native Go;
 execution checks run only when the image architecture matches the host.
 
 `scripts/container.sh` requires the selected base platform to be cached locally
-and prints its exact pull command when missing. It never pulls or publishes an
+and prints its exact pull command when Docker reports the image missing. Other
+inspection failures retain their diagnostics rather than suggesting another pull.
+The build wrapper and image checker share `tooling/container/image_inspect.py`:
+it probes CLI help and, when the flag is present, client/server API versions
+before using `image inspect --platform` (requires [API 1.49+](https://docs.docker.com/reference/cli/docker/image/inspect/)).
+On older clients/APIs it inspects the local default image and still requires
+its metadata to match the requested Linux OS and architecture. It never infers
+an image's platform from the host. If the default local image is the wrong
+platform, explicitly cache the requested platform or use Docker with platform
+selection; the check fails rather than accepting the host architecture.
+It never pulls or publishes an
 application image. Go uses existing dependency caches with `GOPROXY=off` and
 `GOSUMDB=off`; missing dependency sources fail instead of downloading them during
 packaging. Run the explicit native setup step to populate missing caches.
@@ -73,11 +84,15 @@ bash -n scripts/container.sh
 python3 tooling/container/check.py fry:local-test amd64
 ```
 
-The 19 focused regressions reject foreign/dynamic/truncated binaries, stale output
+The focused regressions reject foreign/dynamic/truncated binaries, stale output
 directories, incomplete command sets, context secrets/data/symlinks, personal Go
 configuration, and unavailable notice sources. They also check local replacement
 notices, restrictive-umask notice readability, missing-base/unsupported-architecture
-failures and image-check cleanup failures without Docker.
+failures and image-check cleanup failures without Docker. Compatibility tests
+exercise the real wrapper and checker against an old CLI flag rejection,
+modern foreign-platform selection, old client/server APIs, explicit API limits,
+wrong OS/architecture, and Docker errors that must not be classified as a missing
+base. Each Docker capability or inspection command has a 30-second bound.
 The image checker exports a temporary container filesystem, verifies binaries,
 notices, system TLS roots and data ownership, then starts all four commands with
 `-help`, a read-only root, no network, dropped capabilities and
@@ -120,3 +135,40 @@ These checks establish packaging and command startup. The separate
 retained volumes and crash fencing; the historical results there retain their
 original image identities and build method. Neither record establishes
 production deployment or failure-domain independence.
+
+## Hosted Docker 28.0.4 compatibility repair
+
+Hosted run `39177730860` passed validation but failed packaging after pulling the
+pinned Distroless base: Docker 28.0.4 rejected `image inspect --platform` before
+contacting its daemon. The original wrapper then incorrectly suggested pulling
+the already-present base. The same unsupported flag was present in the image
+checker. The runner's [pinned image manifest](https://raw.githubusercontent.com/actions/runner-images/refs/tags/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md)
+lists CLI/server 28.0.4 and Buildx 0.38.0; the hosted log confirms server API 1.48.
+
+The original preflight failure was reproduced with the official static Docker
+28.0.4 CLI downloaded over HTTPS into `.artifacts/ci-failure-39177730860/docker-compat/`.
+Only `docker/docker` was extracted; the daemon and installed CLI were untouched.
+The source URL matches the [official image recipe](https://raw.githubusercontent.com/docker-library/docker/9412765b2bf39a5264743697803116653b990243/28/cli/Dockerfile).
+Recorded archive SHA-256:
+`6b130fa5fb13516620d5ece0b63f63a495cede428bb2f9e24449022e9d72e0cb`;
+extracted CLI SHA-256:
+`b8ab40a60aa9222c2396570dc2ac9cb1e9f6a8dcaf6e19993d33a92f3d1b2a29`.
+These are recorded download hashes, not independently published checksums.
+
+After the repair, that CLI (API 1.48), the existing Docker 29.9.1 daemon
+(API 1.56), and installed Buildx 0.38.0 passed `make container`,
+`docker run --rm --pull=never ... -help`, and the complete image checker for
+`fry:docker28-compat-39177730860`. Logs are `package-docker28.log`,
+`help-docker28.log`, and `check-docker28.log` in the directory above.
+The local image index was
+`sha256:cc32f6f3d9a6670db7c994c84f9391bd683a7c82a6c087aeae9fa5bc9edd3367`.
+The old CLI and a new CLI constrained with `DOCKER_API_VERSION=1.48` both accepted
+the cached amd64 base and rejected an arm64 request against its amd64 metadata.
+The modern CLI retained platform-selected inspection and rejected the uncached
+arm64 platform. Wrong-OS rejection and successful modern foreign-platform
+selection are covered by deterministic Docker-free regressions.
+
+This verifies old-CLI/new-daemon compatibility, not a full Docker 28 daemon or
+arm64 runtime. No daemon configuration, unrelated image/container, or cache was
+changed. Independent review and the complete final-tree `make check` plus
+container path remain separate required parent gates before pushing.

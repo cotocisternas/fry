@@ -21,12 +21,15 @@ for dependency in docker python3 timeout; do
 done
 # Resolve the one runtime pin from the packaging recipe; never implicitly pull.
 base=$(awk '$1 == "FROM" {print $2}' Dockerfile)
-if ! platform=$(timeout 30 docker image inspect --platform "linux/$arch" \
-    --format '{{.Os}}/{{.Architecture}}' "$base"); then
-  printf 'container: cache the pinned runtime explicitly, then retry:\n  docker pull --platform linux/%s %s\n' "$arch" "$base" >&2
+if python3 "$repo_root/tooling/container/image_inspect.py" "$base" "$arch" >/dev/null; then
+  :
+else
+  status=$?
+  if [[ $status == 3 ]]; then
+    printf 'container: cache the pinned runtime explicitly, then retry:\n  docker pull --platform linux/%s %s\n' "$arch" "$base" >&2
+  fi
   exit 2
 fi
-[[ $platform == "linux/$arch" ]] || { echo 'container: cached runtime platform mismatch.' >&2; exit 2; }
 # Ignore personal Go settings before validating/using the pinned native compiler.
 export GOENV=off
 unset GOROOT
@@ -40,7 +43,5 @@ fry_exec_at "$repo_root" python3 "$repo_root/tooling/container/prepare.py" \
   "$repo_root" "$context" "$arch" "$(fry_binary go)"
 timeout 600 docker build --platform "linux/$arch" --pull=false --network=none \
   --build-arg "TARGETARCH=$arch" --tag "$image" "$context"
-platform=$(timeout 30 docker image inspect --platform "linux/$arch" \
-  --format '{{.Os}}/{{.Architecture}}' "$image")
-[[ $platform == "linux/$arch" ]] || { echo 'container: packaged image platform mismatch.' >&2; exit 2; }
+python3 "$repo_root/tooling/container/image_inspect.py" "$image" "$arch" >/dev/null
 printf 'Packaged %s (linux/%s); no application image was pulled or pushed.\n' "$image" "$arch"

@@ -182,7 +182,13 @@ class PackagingTests(unittest.TestCase):
 
     def test_missing_base_gives_explicit_setup_without_building(self):
         fake = self.context / 'docker'
-        fake.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$DOCKER_CALLS"\nexit 1\n')
+        fake.write_text('''#!/usr/bin/env bash
+printf "%s\\n" "$*" >> "$DOCKER_CALLS"
+if [[ $* == 'image inspect --help' ]]; then echo 'Options: --format'; exit 0; fi
+if [[ $1 == version ]]; then echo '1.48 1.48'; exit 0; fi
+echo 'Error response from daemon: No such image: fixture' >&2
+exit 1
+''')
         fake.chmod(0o755)
         calls = self.context / 'calls'
         environment = dict(os.environ, PATH=f'{self.context}:{os.environ["PATH"]}', DOCKER_CALLS=str(calls))
@@ -190,8 +196,55 @@ class PackagingTests(unittest.TestCase):
                                 env=environment, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 2)
         self.assertIn('docker pull --platform linux/arm64 gcr.io/distroless/', result.stderr)
-        self.assertEqual(len(calls.read_text().splitlines()), 1)
-        self.assertTrue(calls.read_text().startswith('image inspect '))
+        self.assertTrue(all(line.startswith(('image inspect ', 'version '))
+                            for line in calls.read_text().splitlines()))
+
+    def preflight(self, os_name='linux', arch='arm64', failure=''):
+        root = Path(tempfile.mkdtemp(dir=self.context))
+        (root / 'scripts').mkdir()
+        shutil.copyfile(ROOT / 'scripts/container.sh', root / 'scripts/container.sh')
+        shutil.copyfile(ROOT / 'Dockerfile', root / 'Dockerfile')
+        shutil.copytree(ROOT / 'tooling/container', root / 'tooling/container',
+                        ignore=shutil.ignore_patterns('__pycache__'))
+        # Stop at the native compiler boundary; this test never compiles or builds.
+        (root / 'scripts/toolchain.sh').write_text('exit 73\n')
+        fake = root / 'docker'
+        fake.write_text('''#!/usr/bin/env bash
+printf "%s\\n" "$*" >> "$DOCKER_CALLS"
+if [[ $* == 'image inspect --help' ]]; then echo 'Options: --format'; exit 0; fi
+if [[ $1 == version ]]; then echo '1.48 1.48'; exit 0; fi
+if [[ $* == *--platform* ]]; then echo 'unknown flag: --platform' >&2; exit 125; fi
+if [[ -n $DOCKER_FAILURE ]]; then echo "$DOCKER_FAILURE" >&2; exit 1; fi
+printf '[{"Os":"%s","Architecture":"%s"}]\\n' "$DOCKER_OS" "$DOCKER_ARCH"
+''')
+        fake.chmod(0o755)
+        calls = root / 'calls'
+        environment = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}', DOCKER_CALLS=str(calls),
+                           DOCKER_OS=os_name, DOCKER_ARCH=arch, DOCKER_FAILURE=failure)
+        result = subprocess.run(['bash', str(root / 'scripts/container.sh'), 'fry:test', 'arm64'],
+                                env=environment, capture_output=True, text=True, timeout=10)
+        self.assertTrue(all(line.startswith(('image inspect ', 'version '))
+                            for line in calls.read_text().splitlines()))
+        return result
+
+    def test_docker_28_preflight_accepts_explicitly_cached_foreign_platform(self):
+        result = self.preflight()
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertNotIn('unknown flag', result.stderr)
+
+    def test_docker_28_preflight_rejects_wrong_os_or_architecture(self):
+        for os_name, arch in (('windows', 'arm64'), ('linux', 'amd64')):
+            with self.subTest(os_name=os_name, arch=arch):
+                result = self.preflight(os_name, arch)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn('platform mismatch', result.stderr)
+                self.assertNotIn('cache the pinned runtime', result.stderr)
+
+    def test_inspection_failure_is_not_reported_as_missing_base(self):
+        result = self.preflight(failure='permission denied connecting to Docker')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('permission denied', result.stderr)
+        self.assertNotIn('cache the pinned runtime', result.stderr)
 
     def test_unsupported_architecture_stops_before_docker(self):
         result = subprocess.run([str(ROOT / 'scripts/container.sh'), 'fry:test', 'ppc64le'],

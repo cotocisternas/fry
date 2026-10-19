@@ -11,16 +11,23 @@ import check
 
 
 class CleanupTests(unittest.TestCase):
-    def fixture_docker(self, cleanup_failure=None):
+    def fixture_docker(self, cleanup_failure=None, legacy=False, os_name='linux', arch='amd64'):
         events = []
-        inspection = {'Id': 'sha256:fixture', 'Os': 'linux', 'Architecture': 'amd64',
+        inspection = {'Id': 'sha256:fixture', 'Os': os_name, 'Architecture': arch,
                       'Config': {'User': '65532:65532', 'WorkingDir': '/var/lib/fry',
                                  'Entrypoint': ['/usr/local/bin/fry'], 'Cmd': ['-help'],
                                  'StopSignal': 'SIGTERM'}}
 
         def docker(*arguments, timeout=30):
             events.append(arguments)
+            if arguments == ('version', '--format', '{{.Client.APIVersion}} {{.Server.APIVersion}}'):
+                return '1.48 1.48' if legacy else '1.56 1.56'
+            if arguments == ('image', 'inspect', '--help'):
+                return 'Options: --format' if legacy else 'Options: --format --platform'
             if arguments[:2] == ('image', 'inspect'):
+                if legacy and '--platform' in arguments:
+                    raise subprocess.CalledProcessError(125, ['docker', *arguments],
+                                                        stderr='unknown flag: --platform')
                 return json.dumps([inspection])
             if arguments[0] == 'export':
                 with tarfile.open(arguments[2], 'w') as archive:
@@ -47,8 +54,8 @@ class CleanupTests(unittest.TestCase):
 
         return docker, events
 
-    def run_check(self, failure=None):
-        docker, events = self.fixture_docker(failure)
+    def run_check(self, failure=None, legacy=False):
+        docker, events = self.fixture_docker(failure, legacy)
         output = io.StringIO()
         with patch.object(check, 'docker', side_effect=docker), \
                 patch.object(check, 'verify_elf'), \
@@ -64,6 +71,23 @@ class CleanupTests(unittest.TestCase):
                 with patch('builtins.print', side_effect=record_print):
                     check.check('fry:fixture', 'amd64')
         return events
+
+    def test_docker_28_checks_cached_image_without_unsupported_inspect_flag(self):
+        events = self.run_check(legacy=True)
+        inspections = [event for event in events if event[:2] == ('image', 'inspect')]
+        self.assertTrue(inspections)
+        self.assertTrue(all('--platform' not in event for event in inspections))
+        self.assertEqual(sum(event[0] == 'rm' for event in events), 5)
+
+    def test_platform_mismatch_stops_checker_before_container_creation(self):
+        for legacy in (True, False):
+            for os_name, arch in (('windows', 'amd64'), ('linux', 'arm64')):
+                with self.subTest(legacy=legacy, os_name=os_name, arch=arch):
+                    docker, events = self.fixture_docker(legacy=legacy, os_name=os_name, arch=arch)
+                    with patch.object(check, 'docker', side_effect=docker), \
+                            self.assertRaisesRegex(ValueError, 'platform mismatch'):
+                        check.check('fry:fixture', 'amd64')
+                    self.assertFalse(any(event[0] == 'create' for event in events))
 
     def test_export_container_cleanup_failure_cannot_report_success(self):
         events = self.run_check('export')
