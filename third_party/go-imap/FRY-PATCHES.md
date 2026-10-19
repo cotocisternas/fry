@@ -40,6 +40,29 @@ this baseline path without requiring LIST-EXTENDED advertisement.
 
 `fry-history-reader.patch` records the client changes above against the pinned upstream module, including the baseline LSUB encoder/response routing. Keep the companion protocol tests when rebasing.
 
+`fry-command-completion.patch` publishes client command results after
+continuation cancellation, connection-state updates, and result-stream closure.
+It also invalidates cached capabilities before publishing successful LOGIN,
+AUTHENTICATE, UNAUTHENTICATE, and STARTTLS results without a CAPABILITY response
+code. The command state changes before the invalidation launches its asynchronous
+CAPABILITY writer. Logout remains terminal if that writer, or another concurrent
+writer, closes the connection before a detached tagged command completes.
+Previously `Authenticate` could return success while `State()` still reported
+not authenticated, and these commands could return with stale `Caps()`.
+`imapclient/fry_command_completion_test.go` stops completion at its result
+notification to check state, mailbox, LIST/FETCH/EXPUNGE streams, and the tagged
+response capability state, including rejected commands and a CAPABILITY response
+code. A full LIST buffer is drained through `Collect()` to check that publishing
+last does not block a valid consumer. The STARTTLS test checks that the queued
+capability refresh waits for the encoder lock held through the TLS handshake.
+The controlled refresh-write failure test closes the client before the detached
+LOGIN, AUTHENTICATE, UNAUTHENTICATE, SELECT, and UNSELECT completions and checks
+that none restores an open state.
+The existing TCP `TestClient_Authenticate` and `TestStartTLS` exercise the public
+paths. Apply this patch after the other client patches when reconstructing the
+pinned fork. It has zero context lines so the stored patch passes whitespace
+checks; use `patch -p1` or `git apply --unidiff-zero` to apply it.
+
 `fry-shutdown.patch` registers listener wait-group ownership under the same mutex
 as the closed-state transition. This prevents concurrent Serve/Close from
 starting a positive Add after Close began waiting. A connection goroutine that

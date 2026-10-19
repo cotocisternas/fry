@@ -1,0 +1,72 @@
+--- a/imapclient/client.go
++++ b/imapclient/client.go
+@@ -312,3 +312,7 @@
+-	c.state = state
+-	if c.state != imap.ConnStateSelected {
+-		c.mailbox = nil
++	// A concurrent write failure may have already closed the connection.
++	// Logout is terminal even if an earlier command later completes.
++	if c.state != imap.ConnStateLogout {
++		c.state = state
++		if c.state != imap.ConnStateSelected {
++			c.mailbox = nil
++		}
+@@ -514,3 +518,2 @@
+-	done := cmd.base().done
+-	done <- err
+-	close(done)
++	c.completeCommandWithCapReset(cmd, err, false)
++}
+@@ -517,0 +521 @@
++func (c *Client) completeCommandWithCapReset(cmd command, err error, resetCaps bool) {
+@@ -539,3 +543,5 @@
+-			c.state = imap.ConnStateNotAuthenticated
+-			c.mailbox = nil
+-			c.enabled = make(imap.CapSet)
++			if c.state != imap.ConnStateLogout {
++				c.state = imap.ConnStateNotAuthenticated
++				c.mailbox = nil
++				c.enabled = make(imap.CapSet)
++			}
+@@ -547,6 +553,8 @@
+-			c.state = imap.ConnStateSelected
+-			c.mailbox = &SelectedMailbox{
+-				Name:           cmd.mailbox,
+-				NumMessages:    cmd.data.NumMessages,
+-				Flags:          cmd.data.Flags,
+-				PermanentFlags: cmd.data.PermanentFlags,
++			if c.state != imap.ConnStateLogout {
++				c.state = imap.ConnStateSelected
++				c.mailbox = &SelectedMailbox{
++					Name:           cmd.mailbox,
++					NumMessages:    cmd.data.NumMessages,
++					Flags:          cmd.data.Flags,
++					PermanentFlags: cmd.data.PermanentFlags,
++				}
+@@ -573,0 +582,12 @@
++
++	if resetCaps && err == nil {
++		// setCaps may launch a CAPABILITY writer. Apply the command's state
++		// first, but invalidate the cache before publishing its result.
++		c.setCaps(nil)
++	}
++
++	// A waiter can return as soon as it receives the result. Publish it only
++	// after the command's state and data streams are complete.
++	done := cmd.base().done
++	done <- err
++	close(done)
+@@ -806,2 +825,0 @@
+-	c.completeCommand(cmd, cmdErr)
+-
+@@ -811,0 +830 @@
++	var resetCaps bool
+@@ -815,2 +834 @@
+-			// These commands invalidate the capabilities
+-			c.setCaps(nil)
++			resetCaps = true
+@@ -818,0 +837,4 @@
++
++	// STARTTLS holds encMutex through its handshake, so the refresh queued by
++	// completion cannot send another command before TLS is established.
++	c.completeCommandWithCapReset(cmd, cmdErr, resetCaps)

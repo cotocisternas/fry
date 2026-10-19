@@ -309,9 +309,13 @@ func (c *Client) State() imap.ConnState {
 
 func (c *Client) setState(state imap.ConnState) {
 	c.mutex.Lock()
-	c.state = state
-	if c.state != imap.ConnStateSelected {
-		c.mailbox = nil
+	// A concurrent write failure may have already closed the connection.
+	// Logout is terminal even if an earlier command later completes.
+	if c.state != imap.ConnStateLogout {
+		c.state = state
+		if c.state != imap.ConnStateSelected {
+			c.mailbox = nil
+		}
 	}
 	c.mutex.Unlock()
 }
@@ -511,10 +515,10 @@ func findPendingCmdByType[T command](c *Client) T {
 }
 
 func (c *Client) completeCommand(cmd command, err error) {
-	done := cmd.base().done
-	done <- err
-	close(done)
+	c.completeCommandWithCapReset(cmd, err, false)
+}
 
+func (c *Client) completeCommandWithCapReset(cmd command, err error, resetCaps bool) {
 	// Ensure the command is not blocked waiting on continuation requests
 	c.mutex.Lock()
 	var filtered []continuationRequest
@@ -536,20 +540,24 @@ func (c *Client) completeCommand(cmd command, err error) {
 	case *unauthenticateCommand:
 		if err == nil {
 			c.mutex.Lock()
-			c.state = imap.ConnStateNotAuthenticated
-			c.mailbox = nil
-			c.enabled = make(imap.CapSet)
+			if c.state != imap.ConnStateLogout {
+				c.state = imap.ConnStateNotAuthenticated
+				c.mailbox = nil
+				c.enabled = make(imap.CapSet)
+			}
 			c.mutex.Unlock()
 		}
 	case *SelectCommand:
 		if err == nil {
 			c.mutex.Lock()
-			c.state = imap.ConnStateSelected
-			c.mailbox = &SelectedMailbox{
-				Name:           cmd.mailbox,
-				NumMessages:    cmd.data.NumMessages,
-				Flags:          cmd.data.Flags,
-				PermanentFlags: cmd.data.PermanentFlags,
+			if c.state != imap.ConnStateLogout {
+				c.state = imap.ConnStateSelected
+				c.mailbox = &SelectedMailbox{
+					Name:           cmd.mailbox,
+					NumMessages:    cmd.data.NumMessages,
+					Flags:          cmd.data.Flags,
+					PermanentFlags: cmd.data.PermanentFlags,
+				}
 			}
 			c.mutex.Unlock()
 		}
@@ -571,6 +579,18 @@ func (c *Client) completeCommand(cmd command, err error) {
 	case *ExpungeCommand:
 		close(cmd.seqNums)
 	}
+
+	if resetCaps && err == nil {
+		// setCaps may launch a CAPABILITY writer. Apply the command's state
+		// first, but invalidate the cache before publishing its result.
+		c.setCaps(nil)
+	}
+
+	// A waiter can return as soon as it receives the result. Publish it only
+	// after the command's state and data streams are complete.
+	done := cmd.base().done
+	done <- err
+	close(done)
 }
 
 func (c *Client) registerContReq(cmd command) *imapwire.ContinuationRequest {
@@ -803,19 +823,21 @@ func (c *Client) readResponseTagged(tag, typ string) (startTLS *startTLSCommand,
 		return nil, fmt.Errorf("in resp-cond-state: expected OK, NO or BAD status condition, but got %v", typ)
 	}
 
-	c.completeCommand(cmd, cmdErr)
-
 	if cmd, ok := cmd.(*startTLSCommand); ok && cmdErr == nil {
 		startTLS = cmd
 	}
 
+	var resetCaps bool
 	if cmdErr == nil && code != "CAPABILITY" {
 		switch cmd.(type) {
 		case *startTLSCommand, *loginCommand, *authenticateCommand, *unauthenticateCommand:
-			// These commands invalidate the capabilities
-			c.setCaps(nil)
+			resetCaps = true
 		}
 	}
+
+	// STARTTLS holds encMutex through its handshake, so the refresh queued by
+	// completion cannot send another command before TLS is established.
+	c.completeCommandWithCapReset(cmd, cmdErr, resetCaps)
 
 	return startTLS, nil
 }
