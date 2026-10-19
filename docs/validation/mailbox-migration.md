@@ -9,7 +9,7 @@ This is separate from ongoing collection. Collection deliberately ignores later 
 
 ## Modules and state
 
-- `internal/imapsource` authenticates with verified TLS, reads folder/subscription inventories, issues finite UID-window searches, validates metadata, and streams bodies. Explicit plaintext is restricted to numeric loopback addresses. A body is successful only after its UID, literal length, and tagged command completion are verified. Source reads use PEEK and never STORE, EXPUNGE, or delete source mail.
+- `internal/imapsource.Reader` authenticates with verified TLS, reads folder/subscription inventories, issues finite UID-window searches, validates metadata, and streams bodies. Explicit plaintext is restricted to numeric loopback addresses. A body is successful only after its UID, literal length, and tagged command completion are verified. Source reads use PEEK and never STORE, EXPUNGE, or delete source mail.
 - `internal/imapmigrate` coordinates bounded runs and resumes. Each pass captures a complete source folder/UIDVALIDITY/UIDNEXT inventory; UIDNEXT bounds arrivals, not flags or expunges. A new pass fences earlier workers and rescans metadata while retaining accepted copies. A resumed pass continues its durable window cursors.
 - `receiptstore` owns the job, generations, attempts, memberships, reconciliation, audit events, and activation. Receipt acceptance, destination placement, and the migration ledger commit together. Retrying an ambiguous accepted attempt does not append another message.
 

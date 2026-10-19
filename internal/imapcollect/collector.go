@@ -7,7 +7,6 @@ package imapcollect
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,13 +14,10 @@ import (
 	"log/slog"
 	"net"
 	"strings"
-	"sync/atomic"
 	"time"
 
+	"github.com/cotocisternas/fry/internal/imapsource"
 	"github.com/cotocisternas/fry/internal/receiptstore"
-
-	"github.com/emersion/go-imap/v2"
-	"github.com/emersion/go-imap/v2/imapclient"
 )
 
 type (
@@ -73,23 +69,22 @@ func (c *Collector) RunOnce(parent context.Context) (Result, error) {
 	if err := c.bind(ctx); err != nil {
 		return Result{}, err
 	}
-	conn, err := c.dial(ctx)
+	reader, cleanup, err := imapsource.DialCollection(
+		ctx,
+		imapsource.Config{
+			Address:           c.config.Address,
+			Username:          c.config.Username,
+			Password:          c.config.Password,
+			LoopbackPlaintext: c.config.LoopbackPlaintext,
+			MaxMessageBytes:   c.config.MaxMessageBytes,
+		},
+		c.config.DeleteSource,
+	)
 	if err != nil {
 		return Result{}, err
 	}
-	defer closeConnection(conn)
-	stop := context.AfterFunc(ctx, func() { closeConnection(conn) })
-	defer stop()
-	// Strict serialized FETCH routing validates identity even when UID follows a literal.
-	client := imapclient.New(conn, &imapclient.Options{StrictFetchRouting: true})
-	defer closeClient(client)
-	if err = client.Login(c.config.Username, c.config.Password).Wait(); err != nil {
-		return Result{}, fmt.Errorf("imapcollect: authentication failed")
-	}
-	if c.config.DeleteSource && !client.Caps().Has(imap.CapUIDPlus) {
-		return Result{}, fmt.Errorf("imapcollect: safe source cleanup requires UIDPLUS")
-	}
-	run := &collectionRun{collector: c, client: client, conn: conn}
+	defer closeSource(reader)
+	run := &collectionRun{collector: c, reader: reader, sourceCleanup: cleanup}
 	err = run.collectMappings(ctx)
 	return run.result, err
 }
@@ -109,31 +104,10 @@ func (c *Collector) bind(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collector) dial(ctx context.Context) (net.Conn, error) {
-	cfg := c.config
-	var err error
-	dialer := net.Dialer{Timeout: 10 * time.Second}
-	var conn net.Conn
-	if cfg.LoopbackPlaintext {
-		conn, err = dialer.DialContext(ctx, "tcp", cfg.Address)
-	} else {
-		host, _, splitErr := net.SplitHostPort(cfg.Address)
-		if splitErr != nil {
-			return nil, splitErr
-		}
-		tlsDialer := tls.Dialer{NetDialer: &dialer, Config: &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}}
-		conn, err = tlsDialer.DialContext(ctx, "tcp", cfg.Address)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("imapcollect: connection failed")
-	}
-	return conn, nil
-}
-
 func (c *Collector) cleanup(
 	ctx context.Context,
-	client *imapclient.Client,
-	uid imap.UID,
+	cleanup *imapsource.Cleanup,
+	source receiptstore.Source,
 	attempt receiptstore.ID,
 ) error {
 	status, err := c.store.Status(ctx, c.config.Organization, attempt)
@@ -154,104 +128,16 @@ func (c *Collector) cleanup(
 		return err
 	}
 
-	if _, err := client.Store(
-		imap.UIDSetNum(uid),
-		&imap.StoreFlags{
-			Op:     imap.StoreFlagsAdd,
-			Silent: true,
-			Flags:  []imap.Flag{imap.FlagDeleted},
-		},
-		nil,
-	).
-		Collect(); err != nil {
-		return fmt.Errorf("imapcollect: source cleanup flag failed")
-	}
-	if _, err := client.UIDExpunge(imap.UIDSetNum(uid)).Collect(); err != nil {
-		return fmt.Errorf("imapcollect: source cleanup expunge failed")
-	}
-	return nil
-}
-
-// A truncated literal is never promoted to successful EOF. Closing an unfinished
-// source closes the socket to unblock the protocol reader on cancellation.
-type literalSource struct {
-	reader    io.Reader
-	remaining int64
-	conn      net.Conn
-	finished  atomic.Bool
-	finalize  func() error
-}
-
-func (r *literalSource) Read(p []byte) (int, error) {
-	n, err := r.reader.Read(p)
-	r.remaining -= int64(n)
-	if r.remaining < 0 {
-		return n, fmt.Errorf("imapcollect: literal longer than announced")
-	}
-	if err == io.EOF {
-		if r.remaining != 0 {
-			return n, io.ErrUnexpectedEOF
-		}
-		if r.finalize != nil {
-			if e := r.finalize(); e != nil {
-				return n, e
-			}
-		}
-		r.finished.Store(true)
-	}
-	return n, err
-}
-
-func (r *literalSource) Close() error {
-	if !r.finished.Load() {
-		return r.conn.Close()
-	}
-	return nil
-}
-
-func (c *Collector) copyLiteral(
-	ctx context.Context,
-	client *imapclient.Client,
-	conn net.Conn,
-	uid imap.UID,
-	size int64,
-	attempt receiptstore.ID,
-	envelope receiptstore.Envelope,
-) (bool, error) {
-	section := &imap.FetchItemBodySection{Peek: true}
-	cmd := client.Fetch(
-		imap.UIDSetNum(uid),
-		&imap.FetchOptions{UID: true, BodySection: []*imap.FetchItemBodySection{section}},
+	return cleanup.Delete(
+		imapsource.SourceMessage{Folder: source.Folder, UIDValidity: source.UIDValidity, UID: source.UID},
 	)
-	message := cmd.Next()
-	if message == nil {
-		if err := cmd.Close(); err != nil {
-			return false, fmt.Errorf("imapcollect: source fetch failed")
-		}
-		return false, nil
-	}
-	fetch := &sourceFetch{cmd: cmd, message: message, section: section, conn: conn, uid: uid, size: size}
-	reader, err := fetch.literal()
-	if err != nil {
-		abortFetch(conn, cmd)
-		return false, err
-	}
-	if err = c.acceptLiteral(ctx, attempt, envelope, reader); err != nil {
-		abortFetch(conn, cmd)
-		return false, err
-	}
-	// Concurrent acceptance may close an unused stream; reconnect before cleanup.
-	if !reader.finished.Load() {
-		return false, fmt.Errorf("imapcollect: source already accepted concurrently; reconnect")
-	}
-	return true, nil
 }
 
 func (c *Collector) acceptLiteral(
 	ctx context.Context,
 	attempt receiptstore.ID,
 	envelope receiptstore.Envelope,
-	reader *literalSource,
+	reader io.ReadCloser,
 ) error {
 	_, err := c.store.Accept(ctx, attempt, envelope, reader)
 	if errors.Is(err, receiptstore.ErrUncertain) {
@@ -261,98 +147,6 @@ func (c *Collector) acceptLiteral(
 		}
 	}
 	return err
-}
-
-type sourceFetch struct {
-	cmd           *imapclient.FetchCommand
-	message       *imapclient.FetchMessageData
-	section       *imap.FetchItemBodySection
-	conn          net.Conn
-	uid, observed imap.UID
-	size          int64
-}
-
-func (f *sourceFetch) literal() (*literalSource, error) {
-	for item := f.message.Next(); item != nil; item = f.message.Next() {
-		if value, ok := item.(imapclient.FetchItemDataUID); ok {
-			f.observed = value.UID
-			continue
-		}
-		body, ok := item.(imapclient.FetchItemDataBodySection)
-		if !ok {
-			continue
-		}
-		if body.Literal == nil || !body.MatchCommand(f.section) || body.Literal.Size() != f.size {
-			return nil, fmt.Errorf("imapcollect: invalid source literal")
-		}
-		return &literalSource{reader: body.Literal, remaining: f.size, conn: f.conn, finalize: f.finish}, nil
-	}
-	return nil, fmt.Errorf("imapcollect: source omitted its literal")
-}
-
-func (f *sourceFetch) finish() error {
-	// Successful EOF follows UID and the complete tagged response, never just
-	// literal exhaustion. UID may legally arrive after the body literal.
-	for tail := f.message.Next(); tail != nil; tail = f.message.Next() {
-		if value, ok := tail.(imapclient.FetchItemDataUID); ok {
-			f.observed = value.UID
-		}
-		if _, ok := tail.(imapclient.FetchItemDataBodySection); ok {
-			return fmt.Errorf("imapcollect: duplicate source literal")
-		}
-	}
-	if f.observed != f.uid {
-		return fmt.Errorf("imapcollect: source UID mismatch")
-	}
-	if f.cmd.Next() != nil {
-		return fmt.Errorf("imapcollect: extra source message")
-	}
-	if err := f.cmd.Close(); err != nil {
-		return fmt.Errorf("imapcollect: source fetch did not complete")
-	}
-	return nil
-}
-
-func boundedUIDs(data *imap.SearchData) ([]imap.UID, error) {
-	set, ok := data.All.(imap.UIDSet)
-	if !ok {
-		return nil, fmt.Errorf("imapcollect: source did not return UID search results")
-	}
-	var total uint64
-	for _, r := range set {
-		a, b := uint64(r.Start), uint64(r.Stop)
-		if a == 0 || b == 0 {
-			return nil, fmt.Errorf("imapcollect: dynamic source search result")
-		}
-		if a > b {
-			a, b = b, a
-		}
-		total += b - a + 1
-		if total > 1000000 {
-			return nil, fmt.Errorf("imapcollect: source exceeds prototype search limit")
-		}
-	}
-	return data.AllUIDs(), nil
-}
-
-// Connection cleanup must not turn an already accepted receipt into a retry.
-func closeConnection(conn net.Conn) {
-	if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-		slog.Warn("IMAP collection connection cleanup failed")
-	}
-}
-
-func closeClient(client *imapclient.Client) {
-	if err := client.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-		slog.Warn("IMAP collection client cleanup failed")
-	}
-}
-
-func abortFetch(conn net.Conn, cmd *imapclient.FetchCommand) {
-	closeConnection(conn)
-	if err := cmd.Close(); err != nil {
-		slog.Debug("IMAP collection fetch aborted with a protocol error")
-	}
 }
 
 func validConnection(c Config) bool {
@@ -385,4 +179,11 @@ func canonicalInbox(name string) string {
 		return "INBOX"
 	}
 	return name
+}
+
+// Close failures cannot change an already accepted receipt.
+func closeSource(reader *imapsource.CollectionReader) {
+	if err := reader.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		slog.Warn("IMAP collection connection cleanup failed")
+	}
 }

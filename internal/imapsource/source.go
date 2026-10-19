@@ -1,5 +1,7 @@
-// Package imapsource provides a single-session, read-only IMAP history reader.
-// Methods must not run concurrently. The Dial context bounds the whole session.
+// Package imapsource owns serialized IMAP source sessions for migration and collection.
+// Reader is read-only; collection cleanup requires a separately granted capability.
+// Operations are serialized, except cancellation and body Close may overlap Read.
+// The Dial context bounds the whole session.
 // Finite searches bound honest-server results; the underlying parser still
 // allocates LIST names and SEARCH response tokens before application validation.
 package imapsource
@@ -14,6 +16,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -47,7 +50,17 @@ type (
 	}
 )
 
-type Reader struct {
+type Reader struct{ *session }
+
+type session struct {
+	closeOnce         sync.Once
+	closeErr          error
+	closed            atomic.Bool
+	bodyActive        atomic.Bool
+	selected          string
+	epoch             uint32
+	cleanupEnabled    bool
+	collection        bool
 	client            *imapclient.Client
 	conn              net.Conn
 	stop              func() bool
@@ -57,6 +70,14 @@ type Reader struct {
 }
 
 func Dial(ctx context.Context, cfg Config) (*Reader, error) {
+	s, err := dial(ctx, cfg, false, false)
+	if err != nil {
+		return nil, err
+	}
+	return &Reader{s}, nil
+}
+
+func dial(ctx context.Context, cfg Config, collection, cleanup bool) (*session, error) {
 	host, err := cfg.validate()
 	if err != nil {
 		return nil, err
@@ -78,16 +99,23 @@ func Dial(ctx context.Context, cfg Config) (*Reader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("imapsource: connection failed")
 	}
-	r := &Reader{conn: conn, maxBytes: cfg.MaxMessageBytes, omitSubscriptions: cfg.OmitSubscriptions}
-	r.stop = context.AfterFunc(ctx, func() { closeAfterFailure(conn) })
-	r.client = imapclient.New(
-		conn,
-		&imapclient.Options{
-			StrictFetchRouting:           true,
-			RejectDuplicateSearchResults: true,
-			UnilateralDataHandler:        &imapclient.UnilateralDataHandler{Fetch: r.rejectUnexpectedFetch},
-		},
-	)
+	r := &session{
+		collection:        collection,
+		cleanupEnabled:    cleanup,
+		conn:              conn,
+		maxBytes:          cfg.MaxMessageBytes,
+		omitSubscriptions: cfg.OmitSubscriptions,
+	}
+	r.stop = context.AfterFunc(ctx, func() { closeAfterFailure(transportCloser{r}) })
+	opts := &imapclient.Options{
+		StrictFetchRouting:           true,
+		RejectDuplicateSearchResults: true,
+		UnilateralDataHandler:        &imapclient.UnilateralDataHandler{Fetch: r.rejectUnexpectedFetch},
+	}
+	if collection {
+		opts.RejectDuplicateSearchResults = false
+	}
+	r.client = imapclient.New(conn, opts)
 	if err = r.client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
 		closeAfterFailure(r)
 		return nil, fmt.Errorf("imapsource: authentication failed")
@@ -107,9 +135,11 @@ func (cfg Config) validate() (string, error) {
 	return host, nil
 }
 
-func (r *Reader) rejectUnexpectedFetch(msg *imapclient.FetchMessageData) {
-	r.unexpected.Store(true)
-	closeAfterFailure(r.conn)
+func (r *session) rejectUnexpectedFetch(msg *imapclient.FetchMessageData) {
+	if r.bodyActive.Load() || !r.collection {
+		r.unexpected.Store(true)
+		closeAfterFailure(r)
+	}
 	for item := msg.Next(); item != nil; item = msg.Next() {
 		if b, ok := item.(imapclient.FetchItemDataBodySection); ok && b.Literal != nil {
 			if _, err := io.Copy(io.Discard, b.Literal); err != nil {
@@ -119,8 +149,39 @@ func (r *Reader) rejectUnexpectedFetch(msg *imapclient.FetchMessageData) {
 	}
 }
 
-func (r *Reader) Close() error { r.stop(); return r.conn.Close() }
+// transportCloser avoids reading the cancellation callback during its initialization.
+type transportCloser struct{ source *session }
+
+func (c transportCloser) Close() error { return c.source.closeTransport() }
+
+func (r *session) Close() error {
+	if r.stop != nil {
+		r.stop()
+	}
+	return r.closeTransport()
+}
+
+func (r *session) closeTransport() error {
+	r.closeOnce.Do(func() { r.closed.Store(true); r.closeErr = r.conn.Close() })
+	return r.closeErr
+}
+
+var (
+	ErrBodyUnconsumed = errors.New("imapsource: body not fully consumed")
+	ErrSessionClosed  = errors.New("imapsource: session closed")
+)
+
+func (r *session) ready() error {
+	if r.closed.Load() {
+		return ErrSessionClosed
+	}
+	return nil
+}
+
 func (r *Reader) Discover() ([]Folder, error) {
+	if err := r.ready(); err != nil {
+		return nil, err
+	}
 	cmd := r.client.List("", "*", nil)
 	var out []Folder
 	seen := map[string]bool{}
@@ -192,6 +253,9 @@ func (r *Reader) applySubscriptions(out []Folder) error {
 }
 
 func (r *Reader) Select(name string) (Epoch, error) {
+	if err := r.ready(); err != nil {
+		return Epoch{}, err
+	}
 	s, err := r.client.Select(name, &imap.SelectOptions{ReadOnly: true}).Wait()
 	if err != nil {
 		return Epoch{}, err
@@ -203,6 +267,9 @@ func (r *Reader) Select(name string) (Epoch, error) {
 }
 
 func (r *Reader) SearchWindow(first, last uint32) ([]uint32, error) {
+	if err := r.ready(); err != nil {
+		return nil, err
+	}
 	if first == 0 || last < first || uint64(last)-uint64(first)+1 > MaxWindow {
 		return nil, fmt.Errorf("imapsource: invalid finite UID window")
 	}
@@ -242,6 +309,9 @@ func expandUIDs(result imap.UIDSet, first, last uint32) ([]uint32, error) {
 }
 
 func (r *Reader) Metadata(uid uint32) (Metadata, bool, error) {
+	if err := r.ready(); err != nil {
+		return Metadata{}, false, err
+	}
 	var m Metadata
 	if uid == 0 {
 		return m, false, fmt.Errorf("imapsource: zero UID")
@@ -268,10 +338,14 @@ func (r *Reader) Metadata(uid uint32) (Metadata, bool, error) {
 	if err != nil {
 		return m, false, err
 	}
-	if invalid || r.unexpected.Load() || len(seen) != 4 || !m.valid(uid, r.maxBytes) {
+	if invalid || len(seen) != 4 || !r.validMetadata(m, uid) {
 		return m, false, fmt.Errorf("imapsource: invalid metadata")
 	}
 	return m, true, nil
+}
+
+func (r *Reader) validMetadata(m Metadata, uid uint32) bool {
+	return !r.unexpected.Load() && m.valid(uid, r.maxBytes)
 }
 
 func (m Metadata) valid(uid uint32, maxBytes int64) bool {
@@ -334,39 +408,61 @@ func metadataFlags(flags []imap.Flag) ([]string, bool) {
 	return out, valid
 }
 
+const (
+	bodyOpen int32 = iota
+	bodyVerified
+	bodyClosed
+)
+
 type verifiedLiteral struct {
-	reader    io.Reader
-	remaining int64
-	conn      net.Conn
-	finished  bool
-	finalize  func() error
+	reader      io.Reader
+	remaining   int64
+	conn        io.Closer
+	state       atomic.Int32
+	finalize    func() error
+	terminalErr error
 }
 
 func (v *verifiedLiteral) Read(p []byte) (int, error) {
-	if v.finished {
-		return 0, io.EOF
+	if v.terminalErr != nil {
+		return 0, v.terminalErr
 	}
+	switch v.state.Load() {
+	case bodyVerified:
+		return 0, io.EOF
+	case bodyClosed:
+		return 0, ErrSessionClosed
+	}
+	n, err := v.read(p)
+	if err != nil && err != io.EOF { //nolint:errorlint // Only unadorned EOF proves completion.
+		v.terminalErr = err
+		closeAfterFailure(v)
+	}
+	return n, err
+}
+
+func (v *verifiedLiteral) read(p []byte) (int, error) {
 	n, err := v.reader.Read(p)
 	v.remaining -= int64(n)
 	if v.remaining < 0 {
 		return n, fmt.Errorf("imapsource: oversized literal")
 	}
-	// Only the exact EOF sentinel proves framing; wrapped EOF can carry a protocol failure.
-	if err == io.EOF { //nolint:errorlint // Integrity requires an unadorned EOF sentinel.
+	if err == io.EOF { //nolint:errorlint // Only unadorned EOF proves completion.
 		if v.remaining != 0 {
 			return n, io.ErrUnexpectedEOF
 		}
 		if err = v.finalize(); err != nil {
-			closeAfterFailure(v.conn)
 			return n, err
 		}
-		v.finished = true
+		if !v.state.CompareAndSwap(bodyOpen, bodyVerified) {
+			return n, ErrSessionClosed
+		}
 	}
 	return n, err
 }
 
 func (v *verifiedLiteral) Close() error {
-	if !v.finished {
+	if v.state.CompareAndSwap(bodyOpen, bodyClosed) {
 		return v.conn.Close()
 	}
 	return nil
@@ -374,7 +470,12 @@ func (v *verifiedLiteral) Close() error {
 
 // Fetch calls consume synchronously. Success requires consume to read through
 // verified EOF. Closing an unfinished body cancels the entire session.
-func (r *Reader) Fetch(uid uint32, size int64, consume func(io.ReadCloser) error) (bool, error) {
+func (r *session) Fetch(uid uint32, size int64, consume func(io.ReadCloser) error) (bool, error) {
+	if err := r.ready(); err != nil {
+		return false, err
+	}
+	r.bodyActive.Store(true)
+	defer r.bodyActive.Store(false)
 	if uid == 0 || size < 0 || size > r.maxBytes || consume == nil {
 		return false, fmt.Errorf("imapsource: invalid fetch")
 	}
@@ -388,6 +489,9 @@ func (r *Reader) Fetch(uid uint32, size int64, consume func(io.ReadCloser) error
 		err := cmd.Close()
 		if r.unexpected.Load() {
 			err = fmt.Errorf("imapsource: unsolicited FETCH")
+		}
+		if err != nil {
+			closeAfterFailure(r)
 		}
 		return false, err
 	}
@@ -424,19 +528,19 @@ func (s *fetchState) consumeLiteral(
 	if v.Literal == nil || !v.MatchCommand(&imap.FetchItemBodySection{Peek: true}) || v.Literal.Size() != size {
 		return fmt.Errorf("imapsource: invalid literal")
 	}
-	body := &verifiedLiteral{reader: v.Literal, remaining: size, conn: s.reader.conn}
+	body := &verifiedLiteral{reader: v.Literal, remaining: size, conn: s.reader}
 	body.finalize = s.finalize
 	if err := consume(body); err != nil {
 		return err
 	}
-	if !body.finished {
-		return fmt.Errorf("imapsource: body not fully consumed")
+	if body.state.Load() != bodyVerified {
+		return ErrBodyUnconsumed
 	}
 	return nil
 }
 
 type fetchState struct {
-	reader        *Reader
+	reader        *session
 	cmd           *imapclient.FetchCommand
 	msg           *imapclient.FetchMessageData
 	uid, observed uint32
@@ -464,5 +568,5 @@ func (s *fetchState) finalize() error {
 	if s.reader.unexpected.Load() {
 		return fmt.Errorf("imapsource: unsolicited FETCH")
 	}
-	return nil
+	return s.reader.ready()
 }

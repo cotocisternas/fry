@@ -51,9 +51,13 @@ See [receipt validation](validation/replicated-receipts.md) and the
   handoff, retries and failure notices.
 - [`internal/imapcollect`](../internal/imapcollect/): external mailbox collection,
   source deduplication, folder mapping and optional source cleanup.
-- [`internal/imapmigrate`](../internal/imapmigrate/) and
-  [`internal/imapsource`](../internal/imapsource/): staged migration orchestration
-  and the source IMAP adapter. See [migration](validation/mailbox-migration.md).
+- [`internal/imapmigrate`](../internal/imapmigrate/): staged migration orchestration.
+  See [migration](validation/mailbox-migration.md).
+- [`internal/imapsource`](../internal/imapsource/): private IMAP sessions and verified
+  body streaming shared by migration and collection. Migration has a read-only
+  reader; collection has its own search/metadata policy and an optional cleanup
+  capability bound to the selected folder and UIDVALIDITY. Receipt acceptance and
+  retained-original verification remain owned by collection/receiptstore.
 
 ## Administration and shared infrastructure
 
