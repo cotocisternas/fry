@@ -107,7 +107,7 @@ func TestCleanupFairnessActualReadPinPreservesHotCopies(t *testing.T) {
 	a, b := cleanupOriginal(t, f), cleanupOriginal(t, f)
 	entered, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once
-	f.s.beforeReadGates = func() { once.Do(func() { close(entered) }); <-release }
+	f.s.beforeReadAttempt = func(ID) { once.Do(func() { close(entered) }); <-release }
 	releaseRead := sync.OnceFunc(func() { close(release) })
 	defer releaseRead()
 	handle, err := f.s.Open(ctx, f.org, a.ID, 0, a.Size)
@@ -121,7 +121,7 @@ func TestCleanupFairnessActualReadPinPreservesHotCopies(t *testing.T) {
 	select {
 	case <-entered:
 	case <-time.After(3 * time.Second):
-		t.Fatal("pinned read did not reach pre-gate barrier")
+		t.Fatal("pinned read did not reach pre-attempt barrier")
 	}
 	base := time.Now().Add(-72 * time.Hour)
 	cleanupExpireAt(t, f, base, a)

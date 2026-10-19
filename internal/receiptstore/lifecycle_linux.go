@@ -461,16 +461,8 @@ func (s *Store) openReadHandle(
 		defer close(handle.done)
 		defer cancel()
 		defer stop()
-		readErr := s.readPinned(
-			workCtx,
-			request.organization,
-			request.receipt,
-			request.pin,
-			request.offset,
-			request.length,
-			writer,
-			cold,
-		)
+		request.dst = writer
+		readErr := s.readPinned(workCtx, request, cold)
 		if errors.Is(readErr, errReadClosureUncertain) {
 			handle.closeErr = readErr
 		}

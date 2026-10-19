@@ -148,7 +148,7 @@ func TestStorageUsageActualPinAndCleanupCommitFailure(t *testing.T) {
 	r := cleanupOriginal(t, f)
 	entered, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once
-	f.s.beforeReadGates = func() { once.Do(func() { close(entered) }); <-release }
+	f.s.beforeReadAttempt = func(ID) { once.Do(func() { close(entered) }); <-release }
 	releaseRead := sync.OnceFunc(func() { close(release) })
 	defer releaseRead()
 	handle, err := f.s.Open(ctx, f.org, r.ID, 0, r.Size)

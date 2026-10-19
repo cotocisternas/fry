@@ -205,22 +205,49 @@ func TestShardCatalogCannotAdoptUnidentifiedHistory(t *testing.T) {
 
 func TestShardReadRechecksRewrittenLocators(t *testing.T) {
 	f, _ := shardFixture(t)
+	ctx := context.Background()
 	e := f.envelope(t)
 	attempt := attemptFor(f.s, 1)
 	r := accept(t, f.s, attempt, e, "survivor body")
-	member := memberID(f.s.shards[1].Members[0])
-	f.s.beforeReadGates = func() {
-		f.s.beforeReadGates = nil
-		if err := f.s.ReclaimHot(context.Background(), member); err != nil {
+	dead := newID(t)
+	for placementIndex(dead, len(f.s.shards)) != 1 {
+		dead = newID(t)
+	}
+	expireReceipt(t, f, accept(t, f.s, dead, f.envelope(t), "dropped body"))
+	targetFile := func(member ID) string {
+		t.Helper()
+		var file string
+		requireReceiptNoError(t, f.pool.QueryRow(
+			ctx,
+			`SELECT incarnation FROM fry_target WHERE attempt=$1 AND member=$2`,
+			attempt.String(),
+			member.String(),
+		).Scan(&file))
+		return file
+	}
+	var attempts []ID
+	var before string
+	// Rewrite the member after the Store selected it and before it reads. A
+	// fallback to the other replica would hide a stale locator, so exactly one
+	// member attempt must serve the read.
+	f.s.beforeReadAttempt = func(member ID) {
+		attempts = append(attempts, member)
+		if len(attempts) > 1 {
+			return
+		}
+		before = targetFile(member)
+		if err := f.s.ReclaimHot(ctx, member); err != nil {
 			t.Error(err)
 		}
 	}
 	var out bytes.Buffer
 	{
-		err := f.s.Read(context.Background(), f.org, r.ID, 0, r.Size, &out)
-		requireReceiptCondition(t, err == nil, "stale pre-gate locator", out.String(), err)
-		requireReceiptCondition(t, out.String() == "survivor body", "stale pre-gate locator", out.String(), err)
+		err := f.s.Read(ctx, f.org, r.ID, 0, r.Size, &out)
+		requireReceiptCondition(t, err == nil, "stale selected locator", out.String(), err)
+		requireReceiptCondition(t, out.String() == "survivor body", "stale selected locator", out.String(), err)
 	}
+	requireReceiptCondition(t, len(attempts) == 1, "rewritten member fell back to replica", attempts)
+	requireReceiptCondition(t, targetFile(attempts[0]) != before, "reclaim did not rewrite selected target")
 }
 
 func TestShardPersistedPlacementOverridesHash(t *testing.T) {

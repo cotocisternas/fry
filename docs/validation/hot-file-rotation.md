@@ -70,3 +70,21 @@ Run 35523 passed `./scripts/bench.sh load-mail 5000 65536 16 /tmp/fry-load-5000-
 The earlier member-catalog workload observed 417.220/s, p99 51.630 ms, 2,351.628 ms visibility lag, and 14,271 ms cold SEARCH. The new sample therefore has similar intake, a longer visibility backlog and a shorter cold query; these single observations do not establish causation or a stable regression/improvement. Keep the complete results rather than presenting only the favorable metrics.
 
 This ordinary workload uses legacy uncapped files and does not measure rotation latency or sealed-file read throughput. The explicit-rotation process restore above covers correctness of that path. Neither test establishes sustained production rates, independent disk scaling, AZ failure or automatic reclamation.
+
+## Member-owned read lifetime (2026-10-19)
+
+The coordinator no longer holds the local gates of every target while it reads. `Store.readPinned` selects unremoved target members in member-ID order and owns fallback. Each member adapter now owns its read lifetime. The local adapter takes its context-aware read permit, then only its own gate, checks cancellation, closure, transport ownership and freeze under that gate, resolves the authoritative current or sealed locator and closes the descriptor before releasing either. The remote member-owned read keeps its independent pin registration and closure proof. Exclusive maintenance still takes only the gate, so the permit-before-gate order cannot invert. The gate wait is not cancellable; a canceled reader observes cancellation once it holds the gate. The fallback rules are unchanged: no fallback after emitted bytes, destination failure, cancellation or unproven descriptor closure.
+
+There is one intended refinement. The coordinator no longer parses every target's locator before a read. A malformed locator on a replica that is never selected no longer fails a healthy read. A malformed selected locator fails that member before any bytes and may fall back under the rules above.
+
+New PostgreSQL-backed tests in `member_read_ownership_linux_test.go` cover the following cases:
+
+- An exclusively held gate on the unused replica does not delay the selected member's read. The selected member's live descriptor still blocks its own sealed reclamation.
+- With every permit held by real sealed readers and reclamation queued, a permit wait honors its deadline. A reader that holds a permit while waiting for the gate is not released by cancellation; it finishes only after maintenance. A queued reader then reads the reclaimed successor exactly.
+- When a member is closed while a reader waits for its gate, the read falls back to the replica before bytes. Cancellation after emitted bytes does not fall back.
+- A mixed local/remote pair serves full, partial and current reads from either adapter after actual rotation.
+- A malformed locator on the unused member is ignored; a malformed selected locator falls back; two malformed locators fail without output.
+
+`TestShardReadRechecksRewrittenLocators` now rewrites the selected member after candidate selection, requires the rewrite to change its target file, and requires exactly one member attempt. It previously ran before the candidate query on a member with no dropped records, so the rewrite was a no-op. Mutations that restore caller-held gates or eager parsing of every locator fail the unused-gate and malformed-locator tests respectively.
+
+The focused selection `FRY_TEST_PACKAGES='./internal/receiptstore' FRY_TEST_RUN='Read|Sealed|AutomaticRotation|RemoteMaintenance|MemberGRPC|SurvivingMember|Cold|StorageUsage|CleanupFairness' ./scripts/tests/receipts.sh -race` passed. The complete receiptstore package also passed with `FRY_TEST_TIMEOUT=30m FRY_TEST_PACKAGES='./internal/receiptstore' ./scripts/tests/receipts.sh -race -v` without `-short` (`118.449s`). This included the 200 MiB remote stream; only the three opt-in measurement tests skipped. The new and affected read tests also passed 15 consecutive race-enabled repetitions. All runs used disposable PostgreSQL 18.6 and Go 1.27.2. These are local results and make no throughput or latency claim.

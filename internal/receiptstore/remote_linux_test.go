@@ -29,28 +29,38 @@ func remoteFixture(
 	var remote [2]*RemoteMember
 	var servers [2]*MemberServer
 	for i := range remote {
-		memberFixture := *f
-		memberFixture.members[0] = f.members[i]
-		server, certs, url := memberHTTP(t, &memberFixture, wrappers...)
-		opts := RemoteMemberOptions{
-			URL:             url,
-			TLS:             receiptTestValue[*http.Transport](t, certs.allowed.Transport).TLSClientConfig,
-			Member:          f.members[i].id,
-			FailureDomain:   f.members[i].domain,
-			ServerKey:       sha256.Sum256(certs.server.Certificates[0].Leaf.RawSubjectPublicKeyInfo),
-			MaxMessageBytes: f.members[i].opts.MaxMessageBytes,
-			MaxConnections:  8,
-			Timeout:         30 * time.Second,
-		}
-		var err error
-		remote[i], err = DialRemoteMember(context.Background(), opts)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(remote[i].Close)
-		servers[i] = server
+		remote[i], servers[i] = remoteMember(t, f, i, wrappers...)
 	}
 	return remote, servers
+}
+
+// remoteMember transfers f.members[i] to an authenticated member server.
+func remoteMember(
+	t *testing.T,
+	f *fixture,
+	i int,
+	wrappers ...func(http.Handler) http.Handler,
+) (*RemoteMember, *MemberServer) {
+	t.Helper()
+	memberFixture := *f
+	memberFixture.members[0] = f.members[i]
+	server, certs, url := memberHTTP(t, &memberFixture, wrappers...)
+	opts := RemoteMemberOptions{
+		URL:             url,
+		TLS:             receiptTestValue[*http.Transport](t, certs.allowed.Transport).TLSClientConfig,
+		Member:          f.members[i].id,
+		FailureDomain:   f.members[i].domain,
+		ServerKey:       sha256.Sum256(certs.server.Certificates[0].Leaf.RawSubjectPublicKeyInfo),
+		MaxMessageBytes: f.members[i].opts.MaxMessageBytes,
+		MaxConnections:  8,
+		Timeout:         30 * time.Second,
+	}
+	remote, err := DialRemoteMember(context.Background(), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(remote.Close)
+	return remote, server
 }
 
 func TestRemoteReceiptAcceptanceReadAndUnavailableMember(t *testing.T) {

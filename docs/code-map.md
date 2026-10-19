@@ -41,6 +41,15 @@ mail visible to IMAP. A successful local write or RPC is insufficient on its own
 See [receipt validation](validation/replicated-receipts.md) and the
 [member RPC reference](reference/member-rpc.md) for implemented behavior.
 
+Reads follow the same split. `Store.Open` commits the parent pin, then
+`readPinned` in `store_linux.go` selects target members in member-ID order and
+owns fallback: another replica or a published pack is tried only before bytes
+are emitted. Each member adapter owns its own read lifetime and holds no other
+member's gate. `LocalMember.read` in `transport_linux.go` and the member-owned
+remote read in `member_read_linux.go` take a read permit, then that member's
+gate, resolve the authoritative current or sealed locator and close the
+descriptor before returning.
+
 ## Mail protocols and source workflows
 
 - [`internal/smtpserver`](../internal/smtpserver/) and
