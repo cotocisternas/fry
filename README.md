@@ -16,8 +16,8 @@ on-disk formats are experimental.
 
 Use Linux amd64 or arm64 with mise, Bash, Make, the host utilities, Python 3,
 OpenSSL, a C compiler and Docker access listed in
-[development setup](docs/development.md#setup). Access to the private GitHub
-repository is required to clone it.
+[development setup](docs/development.md#setup). The GitHub repository is public;
+cloning does not require repository credentials.
 
 Run in Bash:
 
@@ -77,6 +77,10 @@ percentage does not establish correctness.
 browser regressions, security checks and protobuf compatibility. See
 [CI and local verification](docs/development.md#ci-and-local-verification) for
 prerequisites and the distinction between that gate and release validation.
+Updates to `main` go through pull requests and the required `CI` check.
+Documentation-only changes use a small classification/check path; code changes
+still run the complete suite and container packaging. See
+[repository protection](docs/development.md#repository-protection).
 
 Daily work uses a few Make commands selected for the change. Benchmarks and
 failure rehearsals remain opt-in because they check different contracts; there

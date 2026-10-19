@@ -68,13 +68,13 @@ observability and release qualification remain pending; see the status links abo
    Missing required prerequisites fail the gate. Add vulnerability scanning,
    secret detection and static security checks; high/critical findings block
    merges unless a reviewed exception records a rationale, owner and expiry.
-7. Prepare private, maintainer-triggered releases from an exact selected commit:
+7. Prepare maintainer-triggered releases from an exact selected commit:
    Linux binaries, multi-architecture images, checksums, SBOMs and signed build
    provenance. Expensive load and failure rehearsals are release gates.
 
 CI checks the implemented engineering standards; it is not a substitute for
-improving the code and tests. Required-merge enforcement is unavailable under the
-current private-repository GitHub plan. Consequential refactors receive independent review.
+improving the code and tests. The repository is now public with a PR-only main
+ruleset and required `CI`. Consequential refactors receive independent review.
 
 ## Accepted code-quality baseline
 
@@ -121,12 +121,15 @@ the exact release revision remain part of the detailed design.
 
 ## Repository and publication
 
-The agreed destination is `cotocisternas/fry`, private, with private artifacts
-and container images. GitHub Releases and GHCR are the proposed artifact stores.
+The original private-source requirement was superseded by the user's explicit
+public-visibility instruction. `cotocisternas/fry` is public and `main` requires
+PRs and passing CI without bypass actors. GitHub Releases and GHCR remain the
+proposed artifact stores; release visibility must be settled when that workflow
+is implemented, since GitHub Releases in this repository would be public.
 A maintainer selects a version and explicitly triggers publication after release
-checks. Scope agreement does not itself publish a release. The private repository
-and Actions workflow are operational. Release publication remains unimplemented,
-and branch-protection enforcement requires a supporting GitHub plan.
+checks. The visibility change does not publish a release. The repository,
+Actions workflow and branch rules are operational; release publication remains
+unimplemented.
 
 ## Separate production gates
 

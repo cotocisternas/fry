@@ -142,6 +142,10 @@ examples are in the [acceptance](../docs/validation/acceptance-profile.md),
   owns the real demo, both suites and cleanup. The explicit setup option
   `BROWSER_SETUP_FLAGS=--with-deps` also installs Linux libraries on supported
   distributions; CI uses it on Ubuntu 24.04.
+- [ci/](ci/): lightweight Git-event classification for the Actions workflow.
+  It recognizes a conservative Markdown-only diff before the expensive job;
+  it does not replace `make check` or provide an unchecked success path after
+  classification/test failure. See [CI selection](../docs/development.md#ci-and-local-verification).
 - [generate/](generate/): SQL and protobuf generation adapters. Prefer
   `make generate`, `make generate-check`, `make sqlc` and `make proto-generate`.
 - [lib/](lib/): shared shell/Python toolchain and fixture lifecycle mechanics.

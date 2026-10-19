@@ -7,6 +7,11 @@ required `make check` CI gate. Installation is explicit; checks never install
 or repair tools. The commands support the existing Linux amd64/arm64 native
 toolchain and Linux hosted CI. CI needs a complete Git checkout (`fetch-depth: 0`).
 
+The [documentation-only workflow path](docs/development.md#ci-and-local-verification)
+skips the full suite, including these scans. Its small `CI` result confirms only
+the change classification, not a fresh security scan. Manual workflow dispatch
+always runs full validation; `make security` remains available independently.
+
 The gate includes:
 
 - Govulncheck source analysis with and without tests in the root, both mail

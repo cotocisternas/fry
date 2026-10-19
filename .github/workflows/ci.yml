@@ -14,8 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    outputs:
+      full: ${{ steps.classify.outputs.full }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify changes
+        id: classify
+        run: python3 -m scripts.ci.changes "$GITHUB_EVENT_NAME" "$GITHUB_EVENT_PATH" "$GITHUB_OUTPUT"
+
   validate:
     name: Linux amd64
+    needs: changes
+    if: ${{ needs.changes.outputs.full == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -116,3 +133,23 @@ jobs:
             .artifacts/cache/go-build
             .artifacts/cache/lint
           key: ${{ steps.builds.outputs.cache-primary-key }}
+
+  ci:
+    name: CI
+    needs: [changes, validate]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check decision
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          FULL: ${{ needs.changes.outputs.full }}
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+        run: |
+          if [[ "$CHANGES_RESULT" != success ]]; then
+            exit 1
+          fi
+          case "$FULL:$VALIDATE_RESULT" in
+            true:success|false:skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac

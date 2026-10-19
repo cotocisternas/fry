@@ -101,8 +101,9 @@ baseline. The contributor suite uses short root race/coverage tests; native
 arm64 execution, release/recovery rehearsals, AWS/IAM behavior, production
 capacity and multi-zone durability remain separate evidence.
 
-The repository is private. The parent verified on 2026-10-18 that GitHub's
-branch-protection API returned HTTP 403: the current plan requires GitHub Pro
-or a public repository for this feature. Checks can run, but cannot currently
-be enforced as required merge checks. The repository remains private on the
-current plan; no branch-protection success is claimed.
+During this onboarding validation the repository was private, and GitHub's
+branch-protection API returned HTTP 403 under that plan. The user subsequently
+authorized public visibility and the
+[Protect main ruleset](https://github.com/cotocisternas/fry/rules/25366406) was
+activated. The current [repository policy](../development.md#repository-protection)
+requires PRs and passing CI; the earlier 403 remains historical evidence only.

@@ -13,6 +13,13 @@ identifies the committed source and host prerequisites actually exercised.
 
 ## Commit messages
 
+Push changes to a branch and open a pull request. Direct updates to `main` are
+blocked, including for administrators. Merge through squash or rebase after the
+required `CI` check passes on an up-to-date branch and conversations are resolved.
+The current rule does not require another person's approving review. See
+[repository protection](docs/development.md#repository-protection) for the live
+ruleset and documentation-only CI behavior.
+
 Use Conventional Commits: `type(scope): description`. The scope is optional;
 choose a short description of the actual change. Keep each commit focused on one
 coherent change.
@@ -182,6 +189,10 @@ with `python3 -m` through the repository toolchain. Keep JavaScript tooling logi
 in ordinary JavaScript files. Do not use Python or JavaScript heredocs or
 `-c`/`-e` program strings as permanent implementations. Heredocs containing only
 text or configuration are fine.
+
+The CI change classifier is a small bootstrap exception: it runs as
+`python3 -m scripts.ci.changes` using the Ubuntu runner's standard-library Python
+before deciding whether toolchain setup is needed. Keep it dependency-free.
 
 Edit generator inputs and regenerate; never hand-edit generated `dbgen`, protobuf
 clients or browser RPC bundles. The [code map](docs/code-map.md#source-and-generated-output)

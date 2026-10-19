@@ -31,10 +31,10 @@ API/webhooks remain in their previously agreed later milestone.
 
 The first release provides versioned protobuf definitions, generated Go and
 TypeScript clients, and a readable RPC reference with examples. An OpenAPI
-specification is not required initially. These artifacts follow the previously
-agreed private repository/release policy; this scope decision does not authorize
-publication. The HTTP original-download contract must also be documented because
-it is not described by the RPC method definitions alone.
+specification is not required initially. Source visibility is now public by
+explicit user instruction; release publication still requires the agreed
+maintainer action and release checks. The HTTP original-download contract must
+also be documented because it is not described by the RPC method definitions alone.
 
 Exact packaging conventions remain to be specified. Generated
 code does not replace documentation of permissions, errors, retry IDs, revisions,

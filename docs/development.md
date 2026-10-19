@@ -33,8 +33,9 @@ Install host packages and mise before running setup. Normal setup does not
 install OS packages or configure the Docker daemon. The explicit
 `make browser-setup BROWSER_SETUP_FLAGS=--with-deps` command described below
 also installs Playwright's Linux libraries and may require administrative access.
-Authenticate to GitHub and obtain access to the private `cotocisternas/fry`
-repository before cloning.
+The `cotocisternas/fry` repository is public. Cloning needs no GitHub credentials;
+pushing branches or managing repository settings still requires authentication
+and the appropriate permissions.
 
 Run these commands from the checkout in Bash:
 
@@ -247,8 +248,33 @@ the policy rejects a removed RPC and accepts an additive message.
 
 The [GitHub Actions Build & test workflow](../.github/workflows/ci.yml) runs on
 pull requests, pushes to `main` and manual dispatch, on Ubuntu 24.04 Linux amd64
-with pinned checkout and mise setup. After the native tools and pinned upstream
-images above are prepared, run:
+with pinned checkout and mise setup. Its small `Changes` job classifies the full
+Git diff before starting expensive work. `Linux amd64` runs the existing suite
+and container packaging when required; the final `CI` job is the stable required
+merge check.
+
+The classifier uses the runner's Python standard library and Git directly;
+it does not install the development toolchain to decide whether it is needed.
+
+Only ordinary, non-executable Markdown files in the explicit allowlist qualify
+for the documentation-only path: root `README.md`, `CONTRIBUTING.md`, `SECURITY.md`
+and `GLOSSARY.md`; Markdown under `docs/`; and `README.md` files under `scripts/`,
+`tooling/` and `deploy/`. Code, configuration, workflow changes, symlinks,
+executable files, third-party files and other unknown paths run full validation.
+Python, JSON and HTML under `docs/` are not treated as prose. Rename detection is
+disabled so moving code into a documentation path still checks the old path.
+
+PR classification compares the merge base with the PR head; pushes compare the
+complete before/after range. It is not limited to GitHub's first 300 changed files.
+Manual dispatch always runs the full suite. Missing history requires full
+validation, and a classifier error fails `CI`. A docs-only decision succeeds only
+if classification succeeded and the expensive job was skipped. Thus docs-only
+PRs still have a small required check, without tool setup, service containers,
+builds, test suites or security scans. The workflow is not path-filtered out,
+which would leave a required check pending and block merging.
+
+After the native tools and pinned upstream images above are prepared, run the
+complete suite locally with:
 
 ```sh
 make security-setup
@@ -323,11 +349,28 @@ Successful CI validation evidence is written under
 the final `PASSED` marker; failures remove the old success marker.
 Select individual targets for focused local work and identify their limits.
 
-The repository remains private. On 2026-10-18, GitHub's branch-protection API
-returned HTTP 403 requiring GitHub Pro or a public repository. With the current
-plan, Actions checks can run but cannot be enforced as required merge checks.
-Review check results before merging; do not interpret the workflow as an enforced
-branch-protection rule.
+### Repository protection
+
+The repository became public on 2026-10-18 (America/Santiago). The active
+[Protect main ruleset](https://github.com/cotocisternas/fry/rules/25366406)
+applies to `refs/heads/main`, with no bypass actors, including administrators.
+It requires a pull request, the GitHub Actions `CI` check on an up-to-date branch,
+and resolution of review conversations. Force pushes and branch deletion are
+blocked; squash or rebase merges preserve linear history. The approval quota is
+zero so a solo maintainer can merge their own PR after checks pass; another
+person's approval is not currently mandatory.
+
+These are repository-owned Actions checks, not an immutable external policy.
+PRs can propose changes to the workflow and classifier themselves. Maintainers
+must review those changes before merging; a green result alone does not establish
+that the proposed checks preserve the policy. Fork PR jobs keep read-only
+permissions and do not run through `pull_request_target`.
+
+The intended configuration is stored in
+[`.github/main-ruleset.json`](../.github/main-ruleset.json). Editing that file does
+not apply settings automatically. An authorized operator must update the GitHub
+ruleset and verify the effective rules. The earlier private-repository HTTP 403
+is historical; protection became available after the visibility change.
 
 `make release-check` remains unavailable: native arm64 execution and the broader
 release/recovery rehearsals need their own evidence. A passing local check does

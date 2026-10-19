@@ -110,12 +110,14 @@ budgets remain a proposed part of the detailed test plan, not an active schedule
    transaction, authorization, streaming and resource-ownership contracts.
 4. Introduce the accepted Connect/admin/internal contracts, service-account flows
    and transfer behavior, with relevant wire and integration cases.
-5. Enforce the agreed checks in private GitHub CI and prepare release workflows.
+5. Enforce the agreed checks in GitHub CI and prepare release workflows.
    Bind native amd64/arm64 results, generated-code checks and artifact provenance
    to the exact release revision and recorded dependency/tool inputs.
 
 The maintainer selects a version and explicitly triggers publication. Produce the
-agreed private Linux binaries and multi-architecture images, checksums, SBOMs and
-signed provenance. Passing foundation gates does not establish production HA or
-scale. Real AWS validation still requires account access and remains a separate
+agreed Linux binaries and multi-architecture images, checksums, SBOMs and
+signed provenance. The source repository is now public; artifact visibility must
+be explicit when the release workflow is implemented. Passing foundation gates
+does not establish production HA or scale. Real AWS validation still requires
+account access and remains a separate
 gate; local synthetic fixtures must not be described as AWS validation.

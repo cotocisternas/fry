@@ -25,13 +25,15 @@ The [local repository preparation](validation/repository-initialization.md)
 records canonical module paths, source-only setup verification, subsequent tool
 and image remediation, and the remaining security limits.
 
-The private repository now lives at [cotocisternas/fry](https://github.com/cotocisternas/fry).
+The public repository lives at [cotocisternas/fry](https://github.com/cotocisternas/fry).
 The [contributor workflow](development.md#ci-and-local-verification) runs native
 quality, real PostgreSQL race/coverage, fork, browser, security and administration
 API compatibility checks through `make check`. The [onboarding record](validation/contributor-onboarding.md)
 and [browser runner record](validation/browser-ci.md) distinguish local evidence
-from hosted execution. Private branch protection is unavailable on the current
-GitHub plan, so checks cannot yet be enforced as merge requirements.
+from hosted execution. After the public-visibility change, the active
+[main ruleset](https://github.com/cotocisternas/fry/rules/25366406) requires PRs
+and passing `CI`, with no bypass actors. See
+[repository protection](development.md#repository-protection).
 
 ## Current engineering status
 
@@ -42,11 +44,11 @@ not extend earlier storage, migration or Kubernetes rehearsals to that revision.
 
 | Area | Implemented and checked | Still pending |
 | --- | --- | --- |
-| Development and CI | Native mise tools, strict lint/format/modernization checks, centralized sqlc, generated RPC clients, PostgreSQL race/coverage tests, full mail-fork suites, browser and security gates; Linux amd64 hosted validation and packaging | Native arm64 execution and release qualification; branch-protection enforcement under a supporting GitHub plan |
+| Development and CI | Native mise tools, strict lint/format/modernization checks, centralized sqlc, generated RPC clients, PostgreSQL race/coverage tests, full mail-fork suites, browser and security gates; Linux amd64 hosted validation and packaging; PR-only main ruleset | Native arm64 execution and release qualification |
 | Administration | Typed Connect HTTP/JSON and gRPC, UI/CLI clients, local/OIDC human sessions, scoped authorization and audited full downloads | Service accounts, request deduplication, resource revisions, durable jobs, resumable downloads, complete cursor/error contracts; see the [API gap list](reference/admin-rpc.md#unavailable-foundations-and-compatibility) |
 | Observability | Optional process-owned OpenTelemetry traces/OTLP metrics and bounded instrumentation | Complete logging, readiness and operational metrics contracts; see [telemetry limits](design/sql-and-telemetry.md) |
 | Deployment and recovery | Local storage/process/container validation records and an opt-in AWS S3 probe | Real AWS/IAM execution, metadata HA, automatic crash recovery/fencing, replica repair, AZ-loss evidence, representative capacity and cutover validation |
-| Releases and security | Private repository, MIT license, source/security scans and explicit expiring exceptions | Maintainer-triggered release artifacts, SBOMs/provenance and native arm64 evidence; Kubernetes rehearsal remains on its [security hold](validation/local-kubernetes.md) |
+| Releases and security | Public repository, MIT license, source/security scans and explicit expiring exceptions | Maintainer-triggered release artifacts, SBOMs/provenance and native arm64 evidence; Kubernetes rehearsal remains on its [security hold](validation/local-kubernetes.md) |
 
 The targets for no accepted-mail loss and recovery within five minutes after
 an AZ failure, and a 30-minute migration cutover, remain requirements to prove.
