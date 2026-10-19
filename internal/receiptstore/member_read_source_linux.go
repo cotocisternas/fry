@@ -21,9 +21,9 @@ type memberReadSource struct {
 	length           int64
 }
 
-// The caller holds m.gate for this entire operation, including descriptor close.
-// In-process reads already hold that gate through Store.readPinned: acquiring it
-// again here would deadlock behind a waiting exclusive maintenance operation.
+// acquireRead bounds this member's readers. Every reader takes its permit before
+// m.gate.RLock and holds both until descriptor close; exclusive maintenance takes
+// only the gate, so it never waits for a permit held by a queued reader.
 func (m *LocalMember) acquireRead(ctx context.Context) (func(), error) {
 	select {
 	case m.readPermits <- struct{}{}:

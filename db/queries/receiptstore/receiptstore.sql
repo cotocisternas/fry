@@ -1587,12 +1587,8 @@ SELECT current_setting('fsync'),current_setting('full_page_writes');
 SELECT state FROM fry_attempt WHERE id=$1;
 
 -- name: StoreReadPinnedReadTarget :many
--- Used by readPinned in store_linux.go.
+-- Used by pinnedMembers in store_linux.go.
 SELECT t.member FROM fry_target t JOIN fry_receipt r ON r.attempt=t.attempt WHERE r.id=$1 AND r.organization=$2 AND NOT t.bytes_removed ORDER BY t.member;
-
--- name: StoreReadPinnedReadTargetTMemberTIncarnationTLocator :many
--- Used by readPinned in store_linux.go.
-SELECT t.member,t.incarnation,t.locator FROM fry_target t JOIN fry_receipt r ON r.attempt=t.attempt WHERE r.id=$1 AND r.organization=$2 AND NOT t.bytes_removed ORDER BY t.member;
 
 -- name: GuardSubmissionAuthorization :one
 -- Used by guardSubmissionAuthorization in submission_authority_linux.go.

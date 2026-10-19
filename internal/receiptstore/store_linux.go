@@ -4,7 +4,6 @@ package receiptstore
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cotocisternas/fry/internal/hotstore"
 	"github.com/cotocisternas/fry/internal/receiptstore/dbgen"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,19 +21,19 @@ import (
 // Store owns receipt acceptance, but not its supplied pool or members. The
 // caller must not close these dependencies while operations are running.
 type Store struct {
-	headerCaptures   chan struct{}
-	headerParses     chan struct{}
-	cleanupSelection chan struct{}
-	cleanupCycle     *cleanupCycle
-	mailboxSelection chan struct{}
-	mailboxCursor    string
-	cold             atomic.Pointer[Packer]
-	db               *authority
-	members          []Member
-	shards           []IngestShard
-	memberByID       map[ID]Member
-	afterCopies      func() error
-	beforeReadGates  func()
+	headerCaptures    chan struct{}
+	headerParses      chan struct{}
+	cleanupSelection  chan struct{}
+	cleanupCycle      *cleanupCycle
+	mailboxSelection  chan struct{}
+	mailboxCursor     string
+	cold              atomic.Pointer[Packer]
+	db                *authority
+	members           []Member
+	shards            []IngestShard
+	memberByID        map[ID]Member
+	afterCopies       func() error
+	beforeReadAttempt func(ID)
 }
 
 func New(ctx context.Context, pool *pgxpool.Pool, members [2]*LocalMember, opts Options) (*Store, error) {
@@ -217,58 +215,36 @@ func (s *Store) Read(ctx context.Context, organization, receipt ID, offset, leng
 	return errors.Join(err, r.Close())
 }
 
-func (s *Store) readPinned(
-	ctx context.Context,
-	organization, receipt, pin ID,
-	offset, length int64,
-	dst io.Writer,
-	cold *coldLocation,
-) error {
-	if dst == nil {
+// readPinned selects this receipt's unremoved targets in member order. Each
+// member adapter validates its authoritative target and owns its read lifetime,
+// so no member gate is held here and an unused replica cannot delay the read.
+func (s *Store) readPinned(ctx context.Context, request pinnedReadRequest, cold *coldLocation) error {
+	if request.dst == nil {
 		return fmt.Errorf("receiptstore: destination required")
 	}
-	if _, err := loadReceipt(ctx, s.db.pool, organization, receipt, false); err != nil {
+	if _, err := loadReceipt(ctx, s.db.pool, request.organization, request.receipt, false); err != nil {
 		return err
 	}
-	targets, err := s.pinnedMembers(ctx, organization, receipt)
+	targets, err := s.pinnedMembers(ctx, request.organization, request.receipt)
 	if err != nil {
 		return err
 	}
-	if s.beforeReadGates != nil {
-		s.beforeReadGates()
-	}
-	unlock := lockMemberSet(targets)
-	defer unlock()
-	copies, err := s.pinnedCopies(ctx, organization, receipt)
-	if err != nil {
-		return err
-	}
-	request := pinnedReadRequest{
-		organization: organization,
-		receipt:      receipt,
-		pin:          pin,
-		offset:       offset,
-		length:       length,
-		dst:          dst,
-	}
-	return s.readPinnedCandidates(ctx, request, copies, cold)
+	return s.readPinnedCandidates(ctx, request, targets, cold)
 }
 
 func (s *Store) readPinnedCandidates(
 	ctx context.Context,
 	request pinnedReadRequest,
-	copies []pinnedCopy,
+	targets []Member,
 	cold *coldLocation,
 ) error {
 	var failures []error
-	for _, c := range copies {
-		attempted, terminal, err := s.readPinnedCopy(ctx, request, c)
+	for _, m := range targets {
+		terminal, err := s.readPinnedCopy(ctx, request, m)
 		if terminal {
 			return err
 		}
-		if attempted {
-			failures = append(failures, err)
-		}
+		failures = append(failures, err)
 	}
 	if adapter := s.cold.Load(); adapter != nil && cold != nil {
 		if err := adapter.readLocation(ctx, *cold, request.offset, request.length, request.dst); err == nil {
@@ -651,41 +627,27 @@ func writeAcceptanceRead(
 }
 
 func (s *Store) pinnedMembers(ctx context.Context, organization, receipt ID) ([]Member, error) {
-	// Resolve immutable target member IDs, then lock only their local gates.
-	// Locators are read again below after a rewrite can no longer replace them.
-	memberRows, err := s.db.pool.Query(ctx, dbgen.StoreReadPinnedReadTarget, receipt.String(), organization.String())
+	// Target member IDs are immutable. Each member resolves its own current
+	// locator under its own guards, so a rewrite after this query is harmless.
+	// memberByID is keyed by the immutable IDs validated at construction.
+	rows, err := dbgen.New(s.db.pool).StoreReadPinnedReadTarget(ctx, dbgen.StoreReadPinnedReadTargetParams{
+		ID:           receipt.String(),
+		Organization: organization.String(),
+	})
 	if err != nil {
 		return nil, err
 	}
 	var targets []Member
-	for memberRows.Next() {
-		var raw string
-		if err = memberRows.Scan(&raw); err != nil {
-			break
-		}
-		id, e := idFrom(raw)
-		if e != nil {
-			err = e
-			break
+	for _, raw := range rows {
+		id, err := idFrom(raw)
+		if err != nil {
+			return nil, err
 		}
 		if m := s.memberByID[id]; m != nil {
 			targets = append(targets, m)
 		}
 	}
-	memberErr := memberRows.Err()
-	memberRows.Close()
-	if err != nil {
-		return nil, err
-	}
-	if memberErr != nil {
-		return nil, memberErr
-	}
 	return targets, nil
-}
-
-type pinnedCopy struct {
-	member, inc string
-	loc         hotstore.Locator
 }
 
 type pinnedReadRequest struct {
@@ -694,62 +656,22 @@ type pinnedReadRequest struct {
 	dst                        io.Writer
 }
 
-func (s *Store) pinnedCopies(ctx context.Context, organization, receipt ID) ([]pinnedCopy, error) {
-	rows, err := s.db.pool.Query(
-		ctx,
-		dbgen.StoreReadPinnedReadTargetTMemberTIncarnationTLocator,
-		receipt.String(),
-		organization.String(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var copies []pinnedCopy
-	for rows.Next() {
-		var c pinnedCopy
-		var b []byte
-		if err = rows.Scan(&c.member, &c.inc, &b); err != nil {
-			break
-		}
-		if err = json.Unmarshal(b, &c.loc); err != nil {
-			break
-		}
-		copies = append(copies, c)
-	}
-	rowErr := rows.Err()
-	rows.Close()
-	if err != nil {
-		return nil, err
-	}
-	if rowErr != nil {
-		return nil, rowErr
-	}
-	return copies, nil
-}
-
-func (s *Store) readPinnedCopy(
-	ctx context.Context,
-	request pinnedReadRequest,
-	c pinnedCopy,
-) (attempted, terminal bool, err error) {
-	id, err := idFrom(c.member)
-	if err != nil {
-		return false, true, err
-	}
-	m := s.memberByID[id]
-	if m == nil {
-		return false, false, nil
-	}
-	if m.identity().Member.String() != c.member {
-		return false, false, nil
+// readPinnedCopy reports whether a failure is terminal. Fallback is permitted
+// only before any byte reaches the destination, while the destination and
+// context remain healthy and the member proved its descriptor closure.
+func (s *Store) readPinnedCopy(ctx context.Context, request pinnedReadRequest, m Member) (bool, error) {
+	if s.beforeReadAttempt != nil {
+		s.beforeReadAttempt(memberID(m))
 	}
 	writer := &countedWriter{w: request.dst}
-	err = m.read(ctx, request.pin, request.organization, request.receipt, c.loc, request.offset, request.length, writer)
+	attempt := request
+	attempt.dst = writer
+	err := m.read(ctx, attempt)
 	if err == nil {
-		return true, true, nil
+		return true, nil
 	}
 	if writer.n > 0 || writer.err != nil || ctx.Err() != nil || errors.Is(err, errReadClosureUncertain) {
-		return true, true, err
+		return true, err
 	}
-	return true, false, err
+	return false, err
 }

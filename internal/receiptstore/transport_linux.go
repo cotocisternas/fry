@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cotocisternas/fry/internal/hotstore"
 	"github.com/cotocisternas/fry/internal/receiptstore/dbgen"
 
 	"github.com/jackc/pgx/v5"
@@ -16,12 +15,17 @@ import (
 // Member is sealed to the local and authenticated remote adapters. Each adapter
 // owns cancellation and storage completion; callers cannot substitute an adapter
 // that acknowledges bytes without the corresponding durable authority checks.
+//
+// read serves request.dst from the member's own authoritative target for the
+// pinned receipt. The caller holds no member gate. The adapter validates
+// authority and completes descriptor closure, or reports errReadClosureUncertain,
+// before it returns.
 type Member interface {
 	identity() MemberIdentity
 	available() bool
 	write(context.Context, *authority, claim, io.ReadCloser) error
 	cancelAttempt(context.Context, *authority, ID) error
-	read(context.Context, ID, ID, ID, hotstore.Locator, int64, int64, io.Writer) error
+	read(context.Context, pinnedReadRequest) error
 }
 
 func (m *LocalMember) identity() MemberIdentity {
@@ -29,29 +33,30 @@ func (m *LocalMember) identity() MemberIdentity {
 }
 func (m *LocalMember) available() bool { return !m.closed && !m.isFrozen() && !m.transportOwned }
 
-func (m *LocalMember) read(
-	ctx context.Context,
-	pin, org, receipt ID,
-	loc hotstore.Locator,
-	offset, length int64,
-	dst io.Writer,
-) error {
-	if m.transportOwned {
-		return ErrStale
-	}
-	if m.closed || m.isFrozen() {
-		return ErrStale
-	}
+// read takes a context-aware read permit and then the member gate, the same
+// order as a remote member-owned read. Exclusive maintenance takes only the
+// gate, so queued permit holders cannot invert the order. Waiting for the gate
+// is not cancellable; cancellation is observed once it is held. The descriptor
+// is closed before the gate and permit are released.
+func (m *LocalMember) read(ctx context.Context, request pinnedReadRequest) error {
 	release, err := m.acquireRead(ctx)
 	if err != nil {
 		return err
 	}
 	defer release()
-	source, err := resolveMemberRead(ctx, m.pool, m, pin, org, receipt)
+	m.gate.RLock()
+	defer m.gate.RUnlock()
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	if m.transportOwned || m.closed || m.isFrozen() {
+		return ErrStale
+	}
+	source, err := resolveMemberRead(ctx, m.pool, m, request.pin, request.organization, request.receipt)
 	if err != nil {
 		return err
 	}
-	return m.readSource(ctx, source, offset, length, dst)
+	return m.readSource(ctx, source, request.offset, request.length, request.dst)
 }
 
 // guardPlacement serializes target registration with member replacement. A

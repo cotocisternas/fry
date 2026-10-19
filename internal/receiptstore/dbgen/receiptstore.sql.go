@@ -6575,7 +6575,7 @@ type StoreReadPinnedReadTargetParams struct {
 	Organization string
 }
 
-// Used by readPinned in store_linux.go.
+// Used by pinnedMembers in store_linux.go.
 func (q *Queries) StoreReadPinnedReadTarget(ctx context.Context, arg StoreReadPinnedReadTargetParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, StoreReadPinnedReadTarget, arg.ID, arg.Organization)
 	if err != nil {
@@ -6589,42 +6589,6 @@ func (q *Queries) StoreReadPinnedReadTarget(ctx context.Context, arg StoreReadPi
 			return nil, err
 		}
 		items = append(items, member)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const StoreReadPinnedReadTargetTMemberTIncarnationTLocator = `-- name: StoreReadPinnedReadTargetTMemberTIncarnationTLocator :many
-SELECT t.member,t.incarnation,t.locator FROM fry_target t JOIN fry_receipt r ON r.attempt=t.attempt WHERE r.id=$1 AND r.organization=$2 AND NOT t.bytes_removed ORDER BY t.member
-`
-
-type StoreReadPinnedReadTargetTMemberTIncarnationTLocatorParams struct {
-	ID           string
-	Organization string
-}
-
-type StoreReadPinnedReadTargetTMemberTIncarnationTLocatorRow struct {
-	Member      string
-	Incarnation string
-	Locator     []byte
-}
-
-// Used by readPinned in store_linux.go.
-func (q *Queries) StoreReadPinnedReadTargetTMemberTIncarnationTLocator(ctx context.Context, arg StoreReadPinnedReadTargetTMemberTIncarnationTLocatorParams) ([]StoreReadPinnedReadTargetTMemberTIncarnationTLocatorRow, error) {
-	rows, err := q.db.Query(ctx, StoreReadPinnedReadTargetTMemberTIncarnationTLocator, arg.ID, arg.Organization)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []StoreReadPinnedReadTargetTMemberTIncarnationTLocatorRow
-	for rows.Next() {
-		var i StoreReadPinnedReadTargetTMemberTIncarnationTLocatorRow
-		if err := rows.Scan(&i.Member, &i.Incarnation, &i.Locator); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

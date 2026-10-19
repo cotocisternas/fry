@@ -246,13 +246,7 @@ func (m *RemoteMember) cancelAttempt(ctx context.Context, a *authority, attempt 
 	return remoteRPCError(err)
 }
 
-func (m *RemoteMember) read(
-	ctx context.Context,
-	pin, org, receipt ID,
-	_ hotstore.Locator,
-	offset, length int64,
-	dst io.Writer,
-) (resultErr error) {
+func (m *RemoteMember) read(ctx context.Context, request pinnedReadRequest) (resultErr error) {
 	ctx, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 	operation, err := hotstore.NewID()
@@ -261,11 +255,11 @@ func (m *RemoteMember) read(
 	}
 	stream, err := m.rpc().
 		Read(ctx, &memberv1.ReadRequest{
-			Target:    m.target(claim{Organization: org, Receipt: receipt}),
+			Target:    m.target(claim{Organization: request.organization, Receipt: request.receipt}),
 			Operation: operation.String(),
-			ParentPin: pin.String(),
-			Offset:    offset,
-			Length:    length,
+			ParentPin: request.pin.String(),
+			Offset:    request.offset,
+			Length:    request.length,
 		})
 	if err != nil {
 		return remoteRPCError(err)
@@ -274,10 +268,10 @@ func (m *RemoteMember) read(
 	input := newMemberChunkReader(func() ([]byte, *memberv1.CompressedChunk, *memberv1.Completion, error) {
 		frame, err := stream.Receive()
 		return frame.GetData(), frame.GetCompressedData(), frame.GetCompletion(), memberReceiveError(err)
-	}, length, nil)
+	}, request.length, nil)
 	input.exact = true
-	n, err := io.Copy(dst, input)
-	if err == nil && n != length {
+	n, err := io.Copy(request.dst, input)
+	if err == nil && n != request.length {
 		err = io.ErrUnexpectedEOF
 	}
 	return remoteRPCError(err)
